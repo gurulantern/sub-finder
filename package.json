@@ -1,0 +1,18 @@
+{
+  "name": "subfinder-bolt-app",
+  "version": "1.0.0",
+  "description": "A slack app to randomly choose sub-assignments for available faculty",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "alex ho",
+  "license": "ISC",
+  "dependencies": {
+    "@slack/bolt": "^3.12.1",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.37",
+    "node-schedule": "^2.1.0",
+    "save": "^2.5.0"
+  }
+}
