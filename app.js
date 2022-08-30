@@ -2,6 +2,7 @@ const { App, LogLevel } = require('@slack/bolt');
 var moment = require('moment-timezone/builds/moment-timezone-with-data-10-year-range');
 moment().tz("America/Los_Angeles").format();
 const { scheduleJob } = require('node-schedule');
+require("dotenv").config();
 
 var TeacherCollection = new Map();
 var TACollection = new Map();
