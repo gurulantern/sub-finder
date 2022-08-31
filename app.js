@@ -1,7 +1,8 @@
 const { App, LogLevel } = require('@slack/bolt');
-var moment = require('moment-timezone/builds/moment-timezone-with-data-10-year-range');
+var moment = require('moment-timezone/builds/moment-timezone-with-data');
 moment().tz("America/Los_Angeles").format();
 const { scheduleJob } = require('node-schedule');
+const { viewMaker } = require('./view.js');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -26,8 +27,8 @@ const app = new App({
  * @param {*} faculty Ref to the faculty needed
  * @returns The message that will be posted to the channel for requests
  */
-function postMaker(userId, session, date, time, faculty){
-    return `<@${userId}> needs ${faculty} to sub for ${session} on ${date} at ${time} PDT`;
+function postMaker(userId, session, date, time, faculty, game){
+    return `<@${userId}> is looking for ${faculty} to sub for ${session} playing ${game} on ${date} at ${time} PDT.`;
 }
 
 /**
@@ -45,6 +46,7 @@ async function findConversation(name) {
             if (channel.name === name) {
                 console.log("Found conversation ID " + channel.id);
                 channelId = channel.id;
+                console.log(channelId);
                 return await channel.id;
             }
         }
@@ -84,6 +86,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
     var dd = String(today.getDate()).padStart(2, '0');
     var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
     var yyyy = today.getFullYear();
+    //var view = viewMaker(today);
 
     today = yyyy + '-' + mm + '-' + dd;
     
@@ -120,13 +123,127 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
                         "dispatch_action": false,
                         "block_id": "session",
                         "element": {
-                            "type": "plain_text_input",
-                            "action_id": "session_input"
+                            "type": "static_select",
+                            "action_id": "session_input",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "Select session type",
+                                "emoji": false
+                            },
+                            "options": [
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Open Session",
+                                        "emoji": false
+                                    },
+                                    "value": "an Open Session"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Cohort",
+                                        "emoji": false
+                                    },
+                                    "value": "a Cohort"
+                                }
+                            ]
                         },
                         "label": {
                             "type": "plain_text",
-                            "text": "Name of session or Cohort #",
-                            "emoji": false
+                            "text": "Is this a Cohort or an Open Session?"
+                        }
+                    },
+                    {
+                        "type": "input",
+                        "dispatch_action": false,
+                        "block_id": "game",
+                        "element": {
+                            "type": "static_select",
+                            "action_id": "game_input",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "Select a game",
+                                "emoji": true
+                            },
+                            "options": [
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Constellation",
+                                        "emoji": false
+                                    },
+                                    "value": "Constellation"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Constellation 3D",
+                                        "emoji": false
+                                    },
+                                    "value": "Constellation 3D"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Proxima",
+                                        "emoji": false
+                                    },
+                                    "value": "Proxima"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Fire",
+                                        "emoji": false
+                                    },
+                                    "value": "Fire"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Fish",
+                                        "emoji": false
+                                    },
+                                    "value": "Fish"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Art 4 All",
+                                        "emoji": false
+                                    },
+                                    "value": "Art 4 All"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Hollywood",
+                                        "emoji": false
+                                    },
+                                    "value": "Hollywood"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Geobridge",
+                                        "emoji": false
+                                    },
+                                    "value": "Geobridge"
+                                },
+                                {
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Conundrums",
+                                        "emoji": false
+                                    },
+                                    "value": "Conundrums"
+                                }
+                            ]
+                        },
+                        "label": {
+                            "type": "plain_text",
+                            "text": "What game is being played?"
                         }
                     },
                     {
@@ -208,8 +325,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
                                 }
                             ]
                         }
-                    }
-                    
+                    }    
                 ],
                 "submit": {
                     "type": "plain_text",
@@ -230,24 +346,28 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
     await ack();
 
+    logger.info(view['session']);
+    logger.info(view['game']);
     //Fetch relevant data and store in variables
     userId = body['user']['id'];
-    session = view['state']['values']['session']['session_input']['value'];
+    session = view['state']['values']['session']['session_input']['selected_option']['value'];
+    game = view['state']['values']['game']['game_input']['selected_option']['value'];
     date = view['state']['values']['date']['date_input']['selected_date'];
     time = view['state']['values']['time']['time_input']['selected_time'];
 
     //Use moment to format the time
     msgDate = moment(date, 'YYYY-MM-DD').format('dddd, MMMM Do');
     msgTime = moment(time, 'HH:mm').format('hh:mm a');
+    console.log(msgTime + " " + msgDate);
     faculty = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
 
     //Create a JavaScript Date object for time
     deadline = new Date(moment(date + time, 'YYYY-MM-DDHH:mm').add(1, 'm').toDate());
     console.log(deadline);
-    message = postMaker(userId, session, msgDate, msgTime, faculty);
+    message = postMaker(userId, session, msgDate, msgTime, faculty, game);
     
     //Await for the conversation and the message to publish
-    let channel = await findConversation("substitute-finder");
+    let channel = await findConversation("planned-absences");
     let msgTs = await publishMessage(channel, message);
     console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
 
@@ -412,9 +532,9 @@ async function selectSub(interested, faculty) {
     return await facultyGetter(choices, faculty);
 }
 
-// Listens to incoming messages that contain "hello"
+// Listens to incoming messages that contain "any characters"
 app.message('hello', async ({ message, say }) => {
-    // say() sends a message to the channel where the event was triggered
+    // say() sends a message to the channel that they cannot post here but can request using "/substitute"
     await say(`Hey there <@${message.user}>!`);
   });
 
