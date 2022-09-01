@@ -2,7 +2,6 @@ const { App, LogLevel } = require('@slack/bolt');
 var moment = require('moment-timezone/builds/moment-timezone-with-data');
 moment().tz("America/Los_Angeles").format();
 const { scheduleJob } = require('node-schedule');
-const { viewMaker } = require('./view.js');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
