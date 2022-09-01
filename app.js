@@ -1,8 +1,6 @@
 const { App, LogLevel } = require('@slack/bolt');
-var moment = require('moment-timezone/builds/moment-timezone-with-data');
-moment().tz("America/Los_Angeles").format();
+const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
-const { viewMaker } = require('./view.js');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -354,15 +352,19 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     game = view['state']['values']['game']['game_input']['selected_option']['value'];
     date = view['state']['values']['date']['date_input']['selected_date'];
     time = view['state']['values']['time']['time_input']['selected_time'];
-
-    //Use moment to format the time
-    msgDate = moment(date, 'YYYY-MM-DD').format('dddd, MMMM Do');
-    msgTime = moment(time, 'HH:mm').format('hh:mm a');
-    console.log(msgTime + " " + msgDate);
+    
+    userDt = DateTime.fromFormat(date, "yyyy-mm-dd");
+    pdt = userDt.setZone("America/Los_Angeles");
+    console.log("User: " + userDt.toLocaleString(DateTime.DATETIME_FULL) + " PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL));
+    //Use luxon to format the time
+    //msgDate = 
+    //msgDate = moment(date, 'YYYY-MM-DD').format('dddd, MMMM Do');
+    //msgTime = moment(time, 'HH:mm').format('hh:mm a');
+    //console.log(msgTime + " " + msgDate);
     faculty = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
 
     //Create a JavaScript Date object for time
-    deadline = new Date(moment(date + time, 'YYYY-MM-DDHH:mm').add(1, 'm').toDate());
+    //deadline = new Date(moment(date + time, 'YYYY-MM-DDHH:mm').add(1, 'm').toDate());
     console.log(deadline);
     message = postMaker(userId, session, msgDate, msgTime, faculty, game);
     

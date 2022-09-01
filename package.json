@@ -10,9 +10,9 @@
   "license": "ISC",
   "dependencies": {
     "@slack/bolt": "^3.12.1",
+    "check-node-version": "^4.2.1",
     "dotenv": "^16.0.1",
-    "moment": "^2.29.4",
-    "moment-timezone": "^0.5.37",
+    "luxon": "^3.0.3",
     "node-schedule": "^2.1.0",
     "save": "^2.5.0"
   }
