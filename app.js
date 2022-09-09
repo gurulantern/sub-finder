@@ -6,6 +6,8 @@ require("dotenv").config();
 var TeacherCollection = new Map();
 var TACollection = new Map();
 var TeacherTACollection = new Map();
+const planned = "planned-absences";
+const urgent = "urgent-issues";
 
 // Initializes your app with your bot token, app token, setting it to socket mode for local dev and signing secret
 const app = new App({
@@ -27,6 +29,19 @@ const app = new App({
  */
 function postMaker(userId, session, date, time, faculty, game){
     return `<@${userId}> is looking for ${faculty} to sub for ${session} playing ${game} on ${date} at ${time} PDT.`;
+}
+
+function confirmationMaker(chosenId, userId, session, game, date, time){
+    return `<@${chosenId}>! You have been chosen to sub <@${userId}>'s ${session} playing ${game} on ${date} at ${time} PDT.`;
+}
+
+Date.prototype.today = function () { 
+    return this.getFullYear() + "-" + (this.getMonth()+1) + "-" + ((this.getDate() < 10)?"0":"") + this.getDate();
+}
+
+// For the time now
+Date.prototype.timeNow = function () {
+     return ((this.getHours() < 10)?"0":"") + this.getHours() +":"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +":"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
 }
 
 /**
@@ -80,13 +95,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
     await ack();
 
     //Create the current date to be used as a ref for requesting the sub date
-    var today = new Date();
-    var dd = String(today.getDate()).padStart(2, '0');
-    var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
-    var yyyy = today.getFullYear();
-    //var view = viewMaker(today);
-
-    today = yyyy + '-' + mm + '-' + dd;
+    var today = new Date().today();
     
     try {
         //Call open method for view with client
@@ -344,8 +353,9 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
     await ack();
 
-    logger.info(view['session']);
-    logger.info(view['game']);
+    var currDateTime = new Date().today() + new Date().timeNow();
+    console.log(currDateTime);
+
     //Fetch relevant data and store in variables
     userId = body['user']['id'];
     session = view['state']['values']['session']['session_input']['selected_option']['value'];
@@ -353,9 +363,14 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     date = view['state']['values']['date']['date_input']['selected_date'];
     time = view['state']['values']['time']['time_input']['selected_time'];
     
-    userDt = DateTime.fromFormat(date, "yyyy-mm-dd");
-    pdt = userDt.setZone("America/Los_Angeles");
-    console.log("User: " + userDt.toLocaleString(DateTime.DATETIME_FULL) + " PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL));
+    logger.info("Actual date received: " + date);
+    logger.info("Actual time received: " + time);
+    
+    let isoDate = date + "T" + time + ":00";
+    let userDt = DateTime.fromISO(isoDate);
+    pst = userDt.setZone("America/Los_Angeles");
+    console.log("User: " + userDt.toLocaleString(DateTime.DATETIME_FULL) + " PST: " + pst.toLocaleString(DateTime.DATETIME_FULL));
+    
     //Use luxon to format the time
     //msgDate = 
     //msgDate = moment(date, 'YYYY-MM-DD').format('dddd, MMMM Do');
@@ -365,7 +380,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
     //Create a JavaScript Date object for time
     //deadline = new Date(moment(date + time, 'YYYY-MM-DDHH:mm').add(1, 'm').toDate());
-    console.log(deadline);
+    //console.log(deadline);
     message = postMaker(userId, session, msgDate, msgTime, faculty, game);
     
     //Await for the conversation and the message to publish
