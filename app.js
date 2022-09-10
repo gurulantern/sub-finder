@@ -2,6 +2,7 @@ const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
 const { MongoClient } = require('mongodb');
+const { request_view } = require('./listeners/views/request_view');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -68,15 +69,20 @@ const app = new App({
  * @param {*} faculty Ref to the faculty needed
  * @returns The message that will be posted to the channel for requests
  */
-function postMaker(info){
+function plannedPost(info){
     return `<@${info['userId']}> is looking for *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.`;
 }
 
-function confirmationMaker(chosenId, info){
+function urgentPost(info){
+    return `<@${info['userId']}> needs *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* at *${info['time']} PDT*.`;
+
+}
+
+function confirmation(chosenId, info){
     return `<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* on *${info['date']} at ${info['time']} PDT* for <@${info['userId']}>. \n\nFeel free to dm <@${info['userId']}> for more details. If you can no longer make this session, please submit a new sub-finder request so others may have a chance to sub. \n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
-function notificationMaker(chosenId, info){
+function notification(chosenId, info){
     return `Good news <@${info['userId']}>! Your substitution request for ${info['session']} playing ${info['game']} on ${info['date']} at ${'time'} PDT has been accepted by <@${chosenId}>. \n\nFeel free to dm them to confirm and share any important details. You are all set and should <@${chosenId}> not be able to sub any longer, it is their responsibility to submit a new sub-request. \n\n\n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
@@ -147,243 +153,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
         const result = await client.views.open({
             trigger_id: body.trigger_id,
             //View payload of the request modal
-            view: { 
-                "type": "modal",
-                "callback_id": "request_view",
-                "title": {
-                    "type": "plain_text",
-                    "text": "Substitute Request"
-                },
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": "Hello, let's help you find a substitute."
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "*The time window for finding substitutes is 24 hours so please be sure to post at least 24 hours before the session.",
-                            "emoji": false
-                        }
-                    },
-                    {
-                        "type": "input",
-                        "dispatch_action": false,
-                        "block_id": "session",
-                        "element": {
-                            "type": "static_select",
-                            "action_id": "session_input",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "Select session type",
-                                "emoji": false
-                            },
-                            "options": [
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Open Session",
-                                        "emoji": false
-                                    },
-                                    "value": "an Open Session"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Cohort",
-                                        "emoji": false
-                                    },
-                                    "value": "a Cohort"
-                                }
-                            ]
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "Is this a Cohort or an Open Session?"
-                        }
-                    },
-                    {
-                        "type": "input",
-                        "dispatch_action": false,
-                        "block_id": "game",
-                        "element": {
-                            "type": "static_select",
-                            "action_id": "game_input",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "Select a game",
-                                "emoji": true
-                            },
-                            "options": [
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Constellation",
-                                        "emoji": false
-                                    },
-                                    "value": "Constellation"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Constellation 3D",
-                                        "emoji": false
-                                    },
-                                    "value": "Constellation 3D"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Proxima",
-                                        "emoji": false
-                                    },
-                                    "value": "Proxima"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Fire",
-                                        "emoji": false
-                                    },
-                                    "value": "Fire"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Fish",
-                                        "emoji": false
-                                    },
-                                    "value": "Fish"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Art 4 All",
-                                        "emoji": false
-                                    },
-                                    "value": "Art 4 All"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Hollywood",
-                                        "emoji": false
-                                    },
-                                    "value": "Hollywood"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Geobridge",
-                                        "emoji": false
-                                    },
-                                    "value": "Geobridge"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Conundrums",
-                                        "emoji": false
-                                    },
-                                    "value": "Conundrums"
-                                }
-                            ]
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "What game is being played?"
-                        }
-                    },
-                    {
-                        "type": "input",
-                        "dispatch_action": false,
-                        "block_id": "date",
-                        "element": {
-                            "type": "datepicker",
-                            "action_id": "date_input",
-                            "initial_date": today,
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "Select a date",
-                                "emoji": false
-                            },
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "Date of session (Your time zone):"
-                        }
-                    },
-                    {
-                        "type": "input",
-                        "dispatch_action": false,
-                        "block_id": "time",
-                        "element": {
-                            "type": "timepicker",
-                            "action_id": "time_input",
-                            "initial_time": "12:00",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "Select time",
-                                "emoji": false
-                            },
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "Time of session (Your time  zone):"
-                        }
-                    },
-                    {
-                        "type": "divider"
-                    },
-                    {
-                        "type": "input",
-                        "dispatch_action": false,
-                        "block_id": "faculty",
-                        "label": {
-                            "type": "plain_text",
-                            "text": "Are you in need of a Teacher or a TA?"
-                        },
-                        "element": {
-                            "type": "radio_buttons",
-                            "action_id": "faculty_input",
-                            "options": [
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Teacher",
-                                        "emoji": false
-                                    },
-                                    "value": "a Teacher"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "TA",
-                                        "emoji": false
-                                    },
-                                    "value": "a TA"
-                                },
-                                {
-                                    "text": {
-                                        "type": "plain_text",
-                                        "text": "Either Teacher or TA",
-                                        "emoji": false
-                                    },
-                                    "value": "either a Teacher or a TA"
-                                }
-                            ]
-                        }
-                    }    
-                ],
-                "submit": {
-                    "type": "plain_text",
-                    "text": "Submit"
-                }
-            }
+            view: request_view(today)
         });
         logger.info(result);
     }
@@ -399,6 +169,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     await ack();
     let userTZ = "America/Los_Angeles";
     let channel = "";
+    let msgTs = "";
     var currDateTime = new Date().today() + "T" + new Date().timeNow();
     logger.info("Current date and time: " + currDateTime);
 
@@ -456,24 +227,54 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     console.log("Now:" + now);
     let diffObj = pst.diffNow( 'minutes').toObject(); 
     console.log(diffObj);
-    //if (pst.diffNow( minutes :))
-
-    //Create a JavaScript Date object for time
-    deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
-    message = postMaker(subReqInfo);
     
-    //Await for the conversation and the message to publish
-    channel = await findConversation(planned);
-    let msgTs = await publishMessage(channel, message);
-    console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
+    //Check how close the request is made to the time of session
+    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -60) {
+        message = urgentPost(subReqInfo)
 
-    subReqInfo['deadline'] = deadline;
-    subReqInfo['msgTs'] = msgTs;
-    subReqInfo['channel'] = channel;
+        channel = await findConversation(urgent);
+        let msgTs = await publishMessage(channel, message);
+        logger.info("URGENT POSTING in " + channel + " " + msgTs);
+    
+        subReqInfo['msgTs'] = msgTs;
+        subReqInfo['channel'] = channel;
+    
+        console.log(subReqInfo);
+    } else if (diffObj['minutes'] > 10) {
+        //Await for the conversation and the message to publish
+        deadline = DateTime.now().plus({ minutes: 2 }).toJSDate();
+        message = plannedPost(subReqInfo);
 
-    console.log(subReqInfo);
-    //Use awaited return values to schedule a job to sort interested parties
-    scheduler(subReqInfo);  
+        channel = await findConversation(planned);
+        let msgTs = await publishMessage(channel, message);
+        console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
+
+        subReqInfo['deadline'] = deadline;
+        subReqInfo['msgTs'] = msgTs;
+        subReqInfo['channel'] = channel;
+
+        console.log(subReqInfo);
+        //Use awaited return values to schedule a job to sort interested parties
+
+        plannedScheduler(subReqInfo);  
+    } else if (diffObj['minutes'] <= 10 && diffObj['minutes'] > 1.5) {
+        //Await for the conversation and the message to publish
+        deadline = DateTime.now().plus({ minutes: 2 }).toJSDate();
+        message = plannedPost(subReqInfo);
+
+        channel = await findConversation(planned);
+        let msgTs = await publishMessage(channel, message);
+        console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
+
+        subReqInfo['deadline'] = deadline;
+        subReqInfo['msgTs'] = msgTs;
+        subReqInfo['channel'] = channel;
+
+        console.log(subReqInfo);
+        //Use awaited return values to schedule a job to sort interested parties
+
+        semiPlannedscheduler(subReqInfo);          
+    }
 });
 
 /**
@@ -484,7 +285,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
  * @param {*} userId The user who posted the original request
  * @param {*} session The name of the session that will be subbed
  */
-async function scheduler(info) {
+async function plannedScheduler(info) {
     scheduleJob(info['deadline'], async () => {
         let chosen;
         console.log("Job is firing");
@@ -503,9 +304,14 @@ async function scheduler(info) {
             chosen = await selectSub(interestArr, TeacherTACollection);
         }
 
-        publishMessage(chosen, confirmationMaker(chosen, info));
+        publishMessage(chosen, confirmation(chosen, info));
     })
 }; 
+
+async function semiPlannedScheduler(info) {
+
+
+}
 
 /**
  * 
@@ -631,12 +437,43 @@ async function selectSub(interested, faculty) {
     return await facultyGetter(choices, faculty);
 }
 
+function urgentSelect(user) {
+    publishMessage(chosen, confirmation(chosen, info));
+}
+
 // Listens to incoming messages that contain "any characters"
 app.message(/[\s\S]*/g, async ({ message, say }) => {
     // say() sends a message to the channel that they cannot post here but can request using "/substitute"
-    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in an Message Box.`);
+    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
 });
-
+/*
+app.event('eyes', async ({ reactions, urgentSelect }) => {
+    let urgentChosen = await reactions.user;
+    let channel = await findConversation(urgent);
+    try {
+        // Call the conversations.history method using the built-in WebClient
+        const result = await app.client.conversations.history({
+          token: process.env.SLACK_BOT_TOKEN,
+          channel: id,
+          latest: msgTs,
+          inclusive: true,
+          limit: 1
+        });
+    
+        // There should only be one result (stored in the zeroth index)
+        message = result.messages[0];
+  
+        console.log(message);
+        console.log(message['reactions']);
+        reactArr = message['reactions'];
+        if (reactions.item.channel == await findConversation(urgent)) {
+            urgentSelect(chosen);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+})
+*/
 (async () => {
   // Start your app
   await app.start(process.env.PORT || 3000);
