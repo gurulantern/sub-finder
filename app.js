@@ -1,6 +1,7 @@
 const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
+const { MongoClient } = require('mongodb');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -8,6 +9,45 @@ var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "planned-absences";
 const urgent = "urgent-issues";
+
+async function listDatabases(client) {
+    databasesList = await client.db().admin().listDatabases();
+
+    console.log("Databases:");
+    databasesList.databases.forEach(db => console.log(` - ${db.name})`));
+}
+
+async function dbSetter() {
+    const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+
+        await listDatabases(client);
+    } catch (e) {
+        console.error(e);
+    } finally {
+        await client.close();
+    }
+}
+
+async function dbGetter() {
+    const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
+    const client = new MongoClient(uri);
+
+    try {
+        await client.connect();
+
+        await listDatabases(client);
+    } catch (e) {
+        console.error(e);
+    } finally {
+        await client.close();
+    }
+}
+
+dbGetter().catch(console.error);
 
 // Initializes your app with your bot token, app token, setting it to socket mode for local dev and signing secret
 const app = new App({
@@ -32,7 +72,7 @@ function postMaker(userId, session, date, time, faculty, game){
 }
 
 function confirmationMaker(chosenId, userId, session, game, date, time){
-    return `<@${chosenId}>! You have been chosen to sub <@${userId}>'s ${session} playing *${game}* on *${date}* at *${time} PDT*.`;
+    return `<@${chosenId}>! You have been selected to sub <@${userId}>'s *${session}* playing *${game}* on *${date}* at *${time} PDT*.`;
 }
 
 Date.prototype.today = function () { 
