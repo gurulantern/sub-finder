@@ -28,11 +28,11 @@ const app = new App({
  * @returns The message that will be posted to the channel for requests
  */
 function postMaker(userId, session, date, time, faculty, game){
-    return `<@${userId}> is looking for ${faculty} to sub for ${session} playing ${game} on ${date} at ${time} PDT.`;
+    return `<@${userId}> is looking for *${faculty}* to sub for *${session}* playing *${game}* on *${date}* at *${time} PDT*.`;
 }
 
 function confirmationMaker(chosenId, userId, session, game, date, time){
-    return `<@${chosenId}>! You have been chosen to sub <@${userId}>'s ${session} playing ${game} on ${date} at ${time} PDT.`;
+    return `<@${chosenId}>! You have been chosen to sub <@${userId}>'s ${session} playing *${game}* on *${date}* at *${time} PDT*.`;
 }
 
 Date.prototype.today = function () { 
@@ -269,7 +269,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
                         },
                         "label": {
                             "type": "plain_text",
-                            "text": "Date of session:"
+                            "text": "Date of session (Your time zone):"
                         }
                     },
                     {
@@ -288,7 +288,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
                         },
                         "label": {
                             "type": "plain_text",
-                            "text": "Time of session (Your timezone):"
+                            "text": "Time of session (Your time  zone):"
                         }
                     },
                     {
@@ -352,12 +352,27 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
     await ack();
-
-    var currDateTime = new Date().today() + new Date().timeNow();
+    let userTZ = "America/Los_Angeles";
+    let channel = "";
+    var currDateTime = new Date().today() + "T" + new Date().timeNow();
     console.log(currDateTime);
 
     //Fetch relevant data and store in variables
     userId = body['user']['id'];
+
+    try {
+        const result = await client.users.info({
+            user: userId
+        })
+
+        console.log(result);
+        userTZ = result['user']['tz'];
+        console.log("User TZ : "+ userTZ);
+    }
+    catch (error){
+        console.error(error);
+    }
+
     session = view['state']['values']['session']['session_input']['selected_option']['value'];
     game = view['state']['values']['game']['game_input']['selected_option']['value'];
     date = view['state']['values']['date']['date_input']['selected_date'];
@@ -365,17 +380,27 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     
     logger.info("Actual date received: " + date);
     logger.info("Actual time received: " + time);
-    
-    let isoDate = date + "T" + time + ":00";
-    let userDt = DateTime.fromISO(isoDate);
-    pst = userDt.setZone("America/Los_Angeles");
-    console.log("User: " + userDt.toLocaleString(DateTime.DATETIME_FULL) + " PST: " + pst.toLocaleString(DateTime.DATETIME_FULL));
-    
-    //Use luxon to format the time
-    //msgDate = 
-    //msgDate = moment(date, 'YYYY-MM-DD').format('dddd, MMMM Do');
-    //msgTime = moment(time, 'HH:mm').format('hh:mm a');
-    //console.log(msgTime + " " + msgDate);
+
+    let dateParts = date.split("-");
+    let timeParts = time.split(":");
+
+    let dateTime = DateTime.fromObject({
+        day: dateParts[2],
+        month: dateParts[1],
+        year: dateParts[0],
+        hour: timeParts[0],
+        minutes: timeParts[1]
+    },
+    {
+        zone: userTZ
+    })
+
+    pst = dateTime.setZone("America/Los_Angeles");
+    console.log("User: " + dateTime.toLocaleString(DateTime.DATETIME_FULL) + " PDT: " + pst.toLocaleString(DateTime.DATETIME_FULL));
+    let msgDate = pst.toLocaleString(DateTime.DATE_HUGE);
+    let msgTime = pst.toLocaleString(DateTime.TIME_SIMPLE);
+    console.log(msgTime + " " + msgDate);
+
     faculty = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
 
     //Create a JavaScript Date object for time
@@ -384,7 +409,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     message = postMaker(userId, session, msgDate, msgTime, faculty, game);
     
     //Await for the conversation and the message to publish
-    let channel = await findConversation("planned-absences");
+    channel = await findConversation(planned);
     let msgTs = await publishMessage(channel, message);
     console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
 
