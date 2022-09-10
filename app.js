@@ -9,6 +9,7 @@ var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "planned-absences";
 const urgent = "urgent-issues";
+const any = new RegExp('/[\s\S]+/g');
 
 async function listDatabases(client) {
     databasesList = await client.db().admin().listDatabases();
@@ -67,12 +68,16 @@ const app = new App({
  * @param {*} faculty Ref to the faculty needed
  * @returns The message that will be posted to the channel for requests
  */
-function postMaker(userId, session, date, time, faculty, game){
-    return `<@${userId}> is looking for *${faculty}* to sub for *${session}* playing *${game}* on *${date}* at *${time} PDT*.`;
+function postMaker(info){
+    return `<@${info['userId']}> is looking for *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.`;
 }
 
-function confirmationMaker(chosenId, userId, session, game, date, time){
-    return `<@${chosenId}>! You have been selected to sub <@${userId}>'s *${session}* playing *${game}* on *${date}* at *${time} PDT*.`;
+function confirmationMaker(chosenId, info){
+    return `<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* on *${info['date']} at ${info['time']} PDT* for <@${info['userId']}>. \n\nFeel free to dm <@${info['userId']}> for more details. If you can no longer make this session, please submit a new sub-finder request so others may have a chance to sub. \n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
+}
+
+function notificationMaker(chosenId, info){
+    return `Good news <@${info['userId']}>! Your substitution request for ${info['session']} playing ${info['game']} on ${info['date']} at ${'time'} PDT has been accepted by <@${chosenId}>. \n\nFeel free to dm them to confirm and share any important details. You are all set and should <@${chosenId}> not be able to sub any longer, it is their responsibility to submit a new sub-request. \n\n\n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
 Date.prototype.today = function () { 
@@ -395,14 +400,23 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let userTZ = "America/Los_Angeles";
     let channel = "";
     var currDateTime = new Date().today() + "T" + new Date().timeNow();
-    console.log(currDateTime);
+    logger.info("Current date and time: " + currDateTime);
 
     //Fetch relevant data and store in variables
-    userId = body['user']['id'];
+    let subReqInfo = {
+        userId: body['user']['id'],
+        session: view['state']['values']['session']['session_input']['selected_option']['value'],
+        game: view['state']['values']['game']['game_input']['selected_option']['value'],
+        date: view['state']['values']['date']['date_input']['selected_date'],
+        time: view['state']['values']['time']['time_input']['selected_time'],
+        faculty: view['state']['values']['faculty']['faculty_input']['selected_option']['value']
+    }
+    console.log(subReqInfo);
 
+    //Fetch user's TZ
     try {
         const result = await client.users.info({
-            user: userId
+            user: subReqInfo['userId']
         })
 
         console.log(result);
@@ -413,21 +427,14 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         console.error(error);
     }
 
-    session = view['state']['values']['session']['session_input']['selected_option']['value'];
-    game = view['state']['values']['game']['game_input']['selected_option']['value'];
-    date = view['state']['values']['date']['date_input']['selected_date'];
-    time = view['state']['values']['time']['time_input']['selected_time'];
-    
-    logger.info("Actual date received: " + date);
-    logger.info("Actual time received: " + time);
-
-    let dateParts = date.split("-");
-    let timeParts = time.split(":");
+    //Create a DateTime object with user's TZ
+    let dateParts = subReqInfo['date'].split("-");
+    let timeParts = subReqInfo['time'].split(":");
 
     let dateTime = DateTime.fromObject({
-        day: dateParts[2],
-        month: dateParts[1],
         year: dateParts[0],
+        month: dateParts[1],
+        day: dateParts[2],
         hour: timeParts[0],
         minutes: timeParts[1]
     },
@@ -435,26 +442,38 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         zone: userTZ
     })
 
+    //Create a DateTime in PDT and set post Locale Strings for post in planned-absence
     pst = dateTime.setZone("America/Los_Angeles");
-    console.log("User: " + dateTime.toLocaleString(DateTime.DATETIME_FULL) + " PDT: " + pst.toLocaleString(DateTime.DATETIME_FULL));
+    logger.info("User's TZ: " + dateTime.toLocaleString(DateTime.DATETIME_FULL));
+    logger.info("PDT: " + pst.toLocaleString(DateTime.DATETIME_FULL))
     let msgDate = pst.toLocaleString(DateTime.DATE_HUGE);
     let msgTime = pst.toLocaleString(DateTime.TIME_SIMPLE);
-    console.log(msgTime + " " + msgDate);
+    
+    subReqInfo['date'] = msgDate;
+    subReqInfo['time'] = msgTime;
 
-    faculty = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
+    let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
+    console.log("Now:" + now);
+    let diffObj = pst.diffNow( 'minutes').toObject(); 
+    console.log(diffObj);
+    //if (pst.diffNow( minutes :))
 
     //Create a JavaScript Date object for time
-    //deadline = new Date(moment(date + time, 'YYYY-MM-DDHH:mm').add(1, 'm').toDate());
-    //console.log(deadline);
-    message = postMaker(userId, session, msgDate, msgTime, faculty, game);
+    deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
+    message = postMaker(subReqInfo);
     
     //Await for the conversation and the message to publish
     channel = await findConversation(planned);
     let msgTs = await publishMessage(channel, message);
     console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
 
+    subReqInfo['deadline'] = deadline;
+    subReqInfo['msgTs'] = msgTs;
+    subReqInfo['channel'] = channel;
+
+    console.log(subReqInfo);
     //Use awaited return values to schedule a job to sort interested parties
-    scheduler(deadline, channel, msgTs, userId, session);  
+    scheduler(subReqInfo);  
 });
 
 /**
@@ -465,26 +484,26 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
  * @param {*} userId The user who posted the original request
  * @param {*} session The name of the session that will be subbed
  */
-async function scheduler(deadline, channel, msgTs, userId, session) {
-    scheduleJob(deadline, async () => {
+async function scheduler(info) {
+    scheduleJob(info['deadline'], async () => {
         let chosen;
         console.log("Job is firing");
-        console.log("In schedule "+ channel + " " + msgTs);
-        let interestArr = await fetchInterested(channel, msgTs);
+        console.log("In schedule "+ info['channel'] + " " + info['msgTs']);
+        let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
 
-        if (faculty === "a Teacher") {
+        if (info['faculty'] === "a Teacher") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TeacherCollection);
-        } else if (faculty === "a TA") {
+        } else if (info['faculty'] === "a TA") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TACollection);
-        } else if (faculty === "either a Teacher or a TA") {
+        } else if (info['faculty'] === "either a Teacher or a TA") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TeacherTACollection);
         }
 
-        publishMessage(chosen, `<@${chosen}> you have been selected to substitute for <@${userId}>'s ${session}!`);
+        publishMessage(chosen, confirmationMaker(chosen, info));
     })
 }; 
 
@@ -509,13 +528,11 @@ async function fetchInterested(id, msgTs) {
       // There should only be one result (stored in the zeroth index)
       message = result.messages[0];
 
-      // Print message text
-      console.log(message['text']);
       console.log(message);
       console.log(message['reactions']);
       reactArr = message['reactions'];
       for (let i = 0; i < reactArr.length; i++) {
-          if (reactArr[i]['name'] === 'raised_hands') {
+          if (reactArr[i]['name'] === 'eyes') {
               console.log(reactArr[i]['users']);
               users = reactArr[i]['users'];
               return await users;
@@ -615,10 +632,10 @@ async function selectSub(interested, faculty) {
 }
 
 // Listens to incoming messages that contain "any characters"
-app.message('hello', async ({ message, say }) => {
+app.message(/[\s\S]*/g, async ({ message, say }) => {
     // say() sends a message to the channel that they cannot post here but can request using "/substitute"
-    await say(`Hey there <@${message.user}>!`);
-  });
+    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in an Message Box.`);
+});
 
 (async () => {
   // Start your app
