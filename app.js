@@ -162,6 +162,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let subReqInfo = {
         userId: body['user']['id'],
         session: sessionInput,
+        link: view['state']['values']['link']['link_input']['value'],
         game: view['state']['values']['game']['game_input']['selected_option']['value'],
         date: view['state']['values']['date']['date_input']['selected_date'],
         time: view['state']['values']['time']['time_input']['selected_time'],
@@ -297,7 +298,45 @@ async function semiPlannedScheduler(info) {
 
 
 }
+/*
+async function deleteMsg(msg) {
+    try {
+        // Call the conversations.history method using the built-in WebClient
+        const result = await app.client.conversations.history({
+          token: process.env.SLACK_BOT_TOKEN,
+          channel: id,
+          latest: msg1,
+          inclusive: true,
+          limit: 1
+        });
+    
+        // There should only be one result (stored in the zeroth index)
+        message = result.messages[0];
+  
+        console.log(message);
+        console.log(message['reactions']);
+        reactArr = message['reactions'];
+        for (let i = 0; i < reactArr.length; i++) {
+            if (reactArr[i]['name'] === 'eyes') {
+                console.log(reactArr[i]['users']);
+                users = reactArr[i]['users'];
+                return await users;
+            }
+        }
+    }
+    catch (error) {
+        console.error(error);
+    }
+    console.log(msg + " deleted.");
+}
+async function deleteScheduler(msg1, msg2) {
 
+    scheduleJob( , async () => {
+        await deleteMsg(msg1);
+        await deleteMsg(msg2);    
+    })
+}
+*/
 /**
  * 
  * @param {*} id The channel id to search for the required message
@@ -427,10 +466,11 @@ function urgentSelect(user) {
 }
 
 // Listens to incoming messages that contain "any characters"
-app.message(/[\s\S]*/g, async ({ message, say }) => {
+//app.message(/[\s\S]*/g, async ({ message, say }) => {
     // say() sends a message to the channel that they cannot post here but can request using "/substitute"
-    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
-});
+//    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
+//});
+
 
 app.event('reaction_added', async ({ event }) => {
     console.log(event);

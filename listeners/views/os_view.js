@@ -39,6 +39,20 @@ function osView(today) {
             {
                 "type": "input",
                 "dispatch_action": false,
+                "block_id": "link",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "link_input",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "AV Link",
+                    "emoji": false
+                }
+            },
+            {
+                "type": "input",
+                "dispatch_action": false,
                 "block_id": "game",
                 "element": {
                     "type": "static_select",
