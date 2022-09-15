@@ -1,6 +1,6 @@
 const firstView = {
 	"type": "modal",
-    "callback_id": "first_view",
+	"callback_id": "first_view",
 	"title": {
 		"type": "plain_text",
 		"text": "Sub Request",
@@ -14,12 +14,7 @@ const firstView = {
 				"text": "What type of session do you need subbed?"
 			},
 			"accessory": {
-				"type": "static_select",
-				"placeholder": {
-					"type": "plain_text",
-					"text": "Select an item",
-					"emoji": true
-				},
+				"type": "radio_buttons",
 				"options": [
 					{
 						"text": {

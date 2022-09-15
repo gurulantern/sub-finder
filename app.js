@@ -2,7 +2,6 @@ const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
 const { MongoClient } = require('mongodb');
-const { request_view } = require('./listeners/views/request_view');
 const { firstView } = require('./listeners/views/firstView');
 const { cohortView } = require('./listeners/views/cohort_view');
 const { osView } = require('./listeners/views/os_view');
@@ -14,46 +13,6 @@ var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "planned-absences";
 const urgent = "urgent-issues";
-const any = new RegExp('/[\s\S]+/g');
-
-async function listDatabases(client) {
-    databasesList = await client.db().admin().listDatabases();
-
-    console.log("Databases:");
-    databasesList.databases.forEach(db => console.log(` - ${db.name})`));
-}
-
-async function dbSetter() {
-    const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
-    const client = new MongoClient(uri);
-
-    try {
-        await client.connect();
-
-        await listDatabases(client);
-    } catch (e) {
-        console.error(e);
-    } finally {
-        await client.close();
-    }
-}
-
-async function dbGetter() {
-    const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
-    const client = new MongoClient(uri);
-
-    try {
-        await client.connect();
-
-        await listDatabases(client);
-    } catch (e) {
-        console.error(e);
-    } finally {
-        await client.close();
-    }
-}
-
-dbGetter().catch(console.error);
 
 // Initializes your app with your bot token, app token, setting it to socket mode for local dev and signing secret
 const app = new App({

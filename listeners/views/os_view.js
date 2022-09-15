@@ -11,14 +11,14 @@ function osView(today) {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Hello, let's help you find a substitute."
+                    "text": "Let's help you find a substitute!"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "plain_text",
-                    "text": "*The time window for finding substitutes is 24 hours so please be sure to post at least 24 hours before the session.",
+                    "text": "The time window for finding subs in *#planned-absences* is anytime before the urgent-hour before the session is scheduled to start. If you request a sub in the urgent-hour before the session, the post will be made in *#urgent-issues*.",
                     "emoji": false
                 }
             },
