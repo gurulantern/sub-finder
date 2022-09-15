@@ -205,3 +205,5 @@ function cohortView(today) {
         }
     }
 }
+
+module.exports = { cohortView };

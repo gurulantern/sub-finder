@@ -1,18 +1,9 @@
 const firstView = {
 	"type": "modal",
+    "callback_id": "first_view",
 	"title": {
 		"type": "plain_text",
-		"text": "My App",
-		"emoji": true
-	},
-	"submit": {
-		"type": "plain_text",
-		"text": "Next",
-		"emoji": true
-	},
-	"close": {
-		"type": "plain_text",
-		"text": "Cancel",
+		"text": "Sub Request",
 		"emoji": true
 	},
 	"blocks": [
@@ -36,7 +27,7 @@ const firstView = {
 							"text": "Cohort",
 							"emoji": true
 						},
-						"value": "value-0"
+						"value": "Cohort"
 					},
 					{
 						"text": {
@@ -44,10 +35,10 @@ const firstView = {
 							"text": "Open Session",
 							"emoji": true
 						},
-						"value": "value-1"
+						"value": "Open Session"
 					}
 				],
-				"action_id": "static_select-action"
+				"action_id": "session_type"
 			}
 		}
 	]

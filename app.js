@@ -3,7 +3,7 @@ const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
 const { MongoClient } = require('mongodb');
 const { request_view } = require('./listeners/views/request_view');
-const { firstView } = require('./listeners/views/request_view1');
+const { firstView } = require('./listeners/views/firstView');
 const { cohortView } = require('./listeners/views/cohort_view');
 const { osView } = require('./listeners/views/os_view');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, confirmation, notification } = require('./listeners/views/posts');
@@ -132,16 +132,13 @@ async function publishMessage(id, text) {
 app.command('/substitute', async ({ body, ack, client, logger }) => {
     //Acknowledge shortcut request
     await ack();
-
-    //Create the current date to be used as a ref for requesting the sub date
-    var today = new Date().today();
     
     try {
         //Call open method for view with client
         const result = await client.views.open({
             trigger_id: body.trigger_id,
             //View payload of the request modal
-            view: request_view(today)
+            view: firstView
         });
         logger.info(result);
     }
@@ -150,6 +147,35 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
     }
 });
 
+app.action("session_type", async ({ body, ack, client, logger }) => {
+    await ack();
+
+    let newView = {}
+    let sesh = body["actions"][0]["selected_option"]["value"]
+
+    //Create the current date to be used as a ref for requesting the sub date
+    var today = new Date().today();
+
+    if (sesh === "Cohort") {
+        newView = cohortView(today);
+    } else if (sesh === "Open Session") {
+        newView = osView(today);
+    }
+
+    try {
+        //Call open method for view with client
+        const result = await client.views.update({
+            view_id: body.view.id,
+            hash: body.view.hash,
+            //View payload of the request modal
+            view: newView
+        });
+        logger.info(result);
+    }
+    catch (error) {
+        logger.error(error);
+    }
+})
 
 //Listener for submission of request
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
@@ -465,34 +491,7 @@ app.event('reaction_added', async ({ event }) => {
         console.error(e);
     }
 });
-/*
-app.event('eyes', async ({ reactions, urgentSelect }) => {
-    let urgentChosen = await reactions.user;
-    let channel = await findConversation(urgent);
-    try {
-        // Call the conversations.history method using the built-in WebClient
-        const result = await app.client.conversations.history({
-          token: process.env.SLACK_BOT_TOKEN,
-          channel: id,
-          latest: msgTs,
-          inclusive: true,
-          limit: 1
-        });
-    
-        // There should only be one result (stored in the zeroth index)
-        message = result.messages[0];
-  
-        console.log(message);
-        console.log(message['reactions']);
-        reactArr = message['reactions'];
-        if (reactions.item.channel == await findConversation(urgent)) {
-            urgentSelect(chosen);
-        }
-    } catch (e) {
-        console.error(e);
-    }
-})
-*/
+
 (async () => {
   // Start your app
   await app.start(process.env.PORT || 3000);
