@@ -3,6 +3,9 @@ const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
 const { MongoClient } = require('mongodb');
 const { request_view } = require('./listeners/views/request_view');
+const { firstView } = require('./listeners/views/request_view1');
+const { cohortView } = require('./listeners/views/cohort_view');
+const { osView } = require('./listeners/views/os_view');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, confirmation, notification } = require('./listeners/views/posts');
 require("dotenv").config();
 
@@ -106,7 +109,7 @@ async function findConversation(name) {
 }
 /**
  * 
- * @param {*} id The message's id
+ * @param {*} id The message's channel id
  * @param {*} text The text of the message sent
  * @returns The result of the message posted
  */
@@ -423,7 +426,7 @@ async function selectSub(interested, faculty) {
 }
 
 function urgentSelect(user) {
-    publishMessage(chosen, confirmation(chosen, info));
+    publishMessage(findConversation(urgent), urgentConfirmation(chosen, info));
 }
 
 // Listens to incoming messages that contain "any characters"
