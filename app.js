@@ -3,6 +3,7 @@ const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
 const { MongoClient } = require('mongodb');
 const { request_view } = require('./listeners/views/request_view');
+const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, confirmation, notification } = require('./listeners/views/posts');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -59,32 +60,16 @@ const app = new App({
     appToken: process.env.SLACK_APP_TOKEN,
     logLevel: LogLevel.DEBUG
   });
-
-/**
- * 
- * @param {*} userId Ref to Slack User Id
- * @param {*} session Ref to session name
- * @param {*} date Ref to date of session(PDT)
- * @param {*} time Ref to time of session(PDT)
- * @param {*} faculty Ref to the faculty needed
- * @returns The message that will be posted to the channel for requests
- */
-function plannedPost(info){
-    return `<@${info['userId']}> is looking for *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.`;
+/*
+async function messageParser(message){
+    let subInfo = {
+        userId: ,
+        session: ,
+        game: ,
+        time:
+    }
 }
-
-function urgentPost(info){
-    return `<@${info['userId']}> needs *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* at *${info['time']} PDT*.`;
-
-}
-
-function confirmation(chosenId, info){
-    return `<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* on *${info['date']} at ${info['time']} PDT* for <@${info['userId']}>. \n\nFeel free to dm <@${info['userId']}> for more details. If you can no longer make this session, please submit a new sub-finder request so others may have a chance to sub. \n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
-}
-
-function notification(chosenId, info){
-    return `Good news <@${info['userId']}>! Your substitution request for ${info['session']} playing ${info['game']} on ${info['date']} at ${'time'} PDT has been accepted by <@${chosenId}>. \n\nFeel free to dm them to confirm and share any important details. You are all set and should <@${chosenId}> not be able to sub any longer, it is their responsibility to submit a new sub-request. \n\n\n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
-}
+*/
 
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (this.getMonth()+1) + "-" + ((this.getDate() < 10)?"0":"") + this.getDate();
@@ -445,6 +430,37 @@ function urgentSelect(user) {
 app.message(/[\s\S]*/g, async ({ message, say }) => {
     // say() sends a message to the channel that they cannot post here but can request using "/substitute"
     await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
+});
+
+app.event('reaction_added', async ({ event }) => {
+    console.log(event);
+    let message = {};
+    let reactArr = [];
+    let chosen = "";
+    try {
+        if (await findConversation(urgent) === event['item']['channel']) {
+            message = await app.client.conversations.history({
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: event['item']['channel'],
+                latest: event['item']['ts'],
+                inclusive: true,
+                limit: 1
+            })
+            console.log(message);
+            let msgText = message['messages']['text'];
+            reactArr = message['messages'][0]['reactions'];
+            for (let i = 0; i < reactArr.length; i ++) {
+                if (reactArr[i]['name'] === 'eyes') {
+                    if (reactArr[i]['count'] === 1) {
+                        chosen = reactArr[i]['users'][0];
+                        console.log("Urgent Chosen: " + chosen);
+                    }
+                }
+            }
+        } 
+    } catch (e) {
+        console.error(e);
+    }
 });
 /*
 app.event('eyes', async ({ reactions, urgentSelect }) => {
