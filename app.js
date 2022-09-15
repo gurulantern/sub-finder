@@ -184,13 +184,25 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let userTZ = "America/Los_Angeles";
     let channel = "";
     let msgTs = "";
+    //let facultyInput = "";
+    let sessionInput = "";
     var currDateTime = new Date().today() + "T" + new Date().timeNow();
     logger.info("Current date and time: " + currDateTime);
+
+    logger.info(view);
+
+    if(view['title']['text'] === 'Cohort Sub Request') {
+        //facultyInput = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
+        sessionInput = "Cohort " + view['state']['values']['session']['session_input']['value'];
+    } else if(view['title']['text'] === 'OS Sub Request') {
+        //facultyInput = "either a Teacher or TA";
+        sessionInput = "Open Session: " + view['state']['values']['session']['session_input']['value'];
+    }
 
     //Fetch relevant data and store in variables
     let subReqInfo = {
         userId: body['user']['id'],
-        session: view['state']['values']['session']['session_input']['selected_option']['value'],
+        session: sessionInput,
         game: view['state']['values']['game']['game_input']['selected_option']['value'],
         date: view['state']['values']['date']['date_input']['selected_date'],
         time: view['state']['values']['time']['time_input']['selected_time'],

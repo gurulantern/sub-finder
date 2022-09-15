@@ -24,14 +24,16 @@ function osView(today) {
             },
             {
                 "type": "input",
+                "dispatch_action": false,
+                "block_id": "session",
                 "element": {
                     "type": "plain_text_input",
-                    "action_id": "plain_text_input-action"
+                    "action_id": "session_input",
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Open Session Title",
-                    "emoji": true
+                    "text": "Open Session Name",
+                    "emoji": false
                 }
             },
             {
@@ -133,7 +135,7 @@ function osView(today) {
                 "element": {
                     "type": "datepicker",
                     "action_id": "date_input",
-                    "initial_date": "2022-11-11",
+                    "initial_date": today,
                     "placeholder": {
                         "type": "plain_text",
                         "text": "Select a date",
@@ -162,6 +164,45 @@ function osView(today) {
                 "label": {
                     "type": "plain_text",
                     "text": "Time of session (Your time zone):"
+                }
+            },
+            {
+                "type": "input",
+                "dispatch_action": false,
+                "block_id": "faculty",
+                "label": {
+                    "type": "plain_text",
+                    "text": "Are you in need of a Teacher or a TA?"
+                },
+                "element": {
+                    "type": "radio_buttons",
+                    "action_id": "faculty_input",
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Teacher",
+                                "emoji": false
+                            },
+                            "value": "a Teacher"
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "TA",
+                                "emoji": false
+                            },
+                            "value": "a TA"
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Either Teacher or TA",
+                                "emoji": false
+                            },
+                            "value": "either a Teacher or TA"
+                        }
+                    ]
                 }
             }
         ],

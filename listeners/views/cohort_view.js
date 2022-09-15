@@ -24,14 +24,16 @@ function cohortView(today) {
             },
             {
                 "type": "input",
+                "dispatch_action": false,
+                "block_id": "session",
                 "element": {
                     "type": "plain_text_input",
-                    "action_id": "plain_text_input-action"
+                    "action_id": "session_input"
                 },
                 "label": {
                     "type": "plain_text",
                     "text": "Cohort #",
-                    "emoji": true
+                    "emoji": false
                 }
             },
             {
