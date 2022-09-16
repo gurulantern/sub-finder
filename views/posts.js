@@ -27,7 +27,7 @@ function urgentConfirmation(chosenId, info){
 }
 
 function urgentNotification(chosenId, info){
-    return `Great news <@${info['userId']}>! Your urgent substitution request for ${info['session']} playing ${'game'} at ${info['time']} PDT has been accepted by <@${chosenId}>. \n\nPlease DM them to confirm with them, add them to the session on Portal, and share any important details. You are all set and should <@${chosenId}> not be able to sub any longer, it is their responsibility to submit a new sub-request. \n\n\n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
+    return `Great news <@${info['userId']}>! Your urgent substitution request for ${info['session']} playing ${info['game']} at ${info['time']} PDT has been accepted by <@${chosenId}>. \n\nPlease DM them to confirm with them, add them to the session on Portal, and share any important details. You are all set and should <@${chosenId}> not be able to sub any longer, it is their responsibility to submit a new sub-request. \n\n\n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
 module.exports = { plannedPost, urgentPost, confirmation, notification, urgentConfirmation, urgentNotification, urgentValues };
