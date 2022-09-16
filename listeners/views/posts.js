@@ -19,11 +19,11 @@ function notification(chosenId, info){
 }
 
 function urgentValues(info){
-    return `${info['userId']},${info['session']},${info['game']},${info['time']},${info['link'],info['faculty']}`;
+    return `${info['userId']},${info['session']},${info['game']},${info['time']},${info['faculty']}`;
 }
 
 function urgentConfirmation(chosenId, info){
-    return `++++ URGENT ++++\n\n<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* at ${info['time']} PDT*  for <@${info['userId']}>. \n\nYou can join the session <${info['link']}|here>. DM <@${info['userId']}> for more info and have them add you to the session. \n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
+    return `++++ URGENT ++++\n\n<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* at ${info['time']} PDT*  for <@${info['userId']}>. \n\nDM <@${info['userId']}> for more info and have them add you to the session. \n\n\n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
 function urgentNotification(chosenId, info){

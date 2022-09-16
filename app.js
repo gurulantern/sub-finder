@@ -6,7 +6,7 @@ const { firstView } = require('./listeners/views/firstView');
 const { cohortView } = require('./listeners/views/cohort_view');
 const { osView } = require('./listeners/views/os_view');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./listeners/views/posts');
-const { plannedModal, dateBlocks, urgentModal, resolvedModal } = require('./listeners/views/post_modals');
+const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./listeners/views/post_modals');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -153,8 +153,11 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
         link: infoArr[4],
         faculty: infoArr[5]
     }    
+    console.log(body['actions'][0]['value']);
+    console.log(infoArr);
+    console.log(subReqInfo);
 
-    if (chosen !== subReqInfo['userId']) {
+    //if (chosen === subReqInfo['userId']) {
         try {
             //Call open method for view with client
             const result = await client.chat.update({
@@ -165,13 +168,13 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 blocks: resolvedModal(body['user']['id'], body['message']['text'])
             });
 
-            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo));
-            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo));
+            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo), messageModal(urgentConfirmation(chosen, subReqInfo)));
+            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), messageModal(urgentNotification(chosen, subReqInfo)));
         }
         catch (error) {
             logger.error(error);
         }
-    }
+    //}
 })
 
 //Listener for submission of request
@@ -257,7 +260,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -60) {
         message = urgentPost(subReqInfo);
         values = urgentValues(subReqInfo);
-        blocks = urgentModal(message, values);
+        blocks = urgentModal(message, values, subReqInfo['link']);
         console.log("Message: " + message);
         console.log("Value: " + values);
         console.log("Block: " + blocks);

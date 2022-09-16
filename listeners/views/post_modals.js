@@ -16,13 +16,27 @@ function plannedModal (msg, dateBlocks) {
     return block;
 }
 
+function messageModal(msg) {
+    block = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": msg
+            }
+        }
+    ];
+
+    return block;
+}
+
 function dateBlocks (info) {
     
 
     return dateArray
 }
 
-function urgentModal (msg, value) {
+function urgentModal (msg, value, link) {
     block = [
         {
             "type": "section",
@@ -41,7 +55,8 @@ function urgentModal (msg, value) {
                         "text": "Assist"
                     },
                     "value": value,
-                    "action_id": "urgent_assist"
+                    "action_id": "urgent_assist",
+                    "url": link,
                 }
             ]
         }
@@ -71,4 +86,4 @@ function resolvedModal(user, msg) {
     return resolved;
 }
 
-module.exports = { plannedModal, dateBlocks, urgentModal, resolvedModal };
+module.exports = { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal };
