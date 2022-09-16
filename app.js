@@ -1,12 +1,12 @@
 const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
-const { scheduleJob } = require('node-schedule');
+const { scheduleJob }  = require('node-schedule');
 const { MongoClient, CURSOR_FLAGS } = require('mongodb');
-const { firstView } = require('./listeners/views/firstView');
-const { cohortView } = require('./listeners/views/cohort_view');
-const { osView } = require('./listeners/views/os_view');
-const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./listeners/views/posts');
-const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./listeners/views/post_modals');
+const { firstView } = require('./views/first_view');
+const { cohortView } = require('./views/cohort_view');
+const { osView } = require('./views/os_view');
+const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./views/posts');
+const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -14,6 +14,7 @@ var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "planned-absences";
 const urgent = "urgent-issues";
+
 
 /*
 //MongoDB variables
@@ -42,11 +43,7 @@ Date.prototype.timeNow = function () {
      return ((this.getHours() < 10)?"0":"") + this.getHours() +":"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +":"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
 }
 
-/**
- * 
- * @param {*} name The name of the channel that sub-finder posts to
- * @returns The channel's id string
- */
+
 async function findConversation(name) {
     try {
         const result = await app.client.conversations.list({
@@ -66,12 +63,8 @@ async function findConversation(name) {
         console.error(error);
     }
 }
-/**
- * 
- * @param {*} id The message's channel id
- * @param {*} text The text of the message sent
- * @returns The result of the message posted
- */
+
+
 async function publishMessage(id, text, blocks) {
     try {
         const result = await app.client.chat.postMessage({
@@ -292,7 +285,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         plannedScheduler(subReqInfo);  
     } else if (diffObj['minutes'] <= 10 && diffObj['minutes'] > 1.5) {
         //Await for the conversation and the message to publish
-        deadline = DateTime.now().plus({ minutes: 2 }).toJSDate();
+        deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
@@ -310,34 +303,40 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     }
 });
 
-/**
- * 
- * @param {*} deadline The JavaScript Date object made in the submission
- * @param {*} channel The channel id from the submission
- * @param {*} msgTs The message to found and searched for reactions
- * @param {*} userId The user who posted the original request
- * @param {*} session The name of the session that will be subbed
- */
+async function urgentScheduler(info) {
+    
+    
+    scheduleJob()
+}
+
 async function plannedScheduler(info) {
-    scheduleJob(info['deadline'], async () => {
+
+    scheduleJob(info['msgTs'], info['deadline'], async () => {
         let chosen;
-        console.log("Job is firing");
-        console.log("In schedule "+ info['channel'] + " " + info['msgTs']);
+        console.log("Planned Job is firing");
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
 
-        if (info['faculty'] === "Teacher") {
-            console.log(interestArr);
-            chosen = await selectSub(interestArr, TeacherCollection);
-        } else if (info['faculty'] === "TA") {
-            console.log(interestArr);
-            chosen = await selectSub(interestArr, TACollection);
-        } else if (info['faculty'] === "qualified Teacher or TA") {
-            console.log(interestArr);
-            chosen = await selectSub(interestArr, TeacherTACollection);
-        }
+        if (typeof interestArr !== "undefined") {
+            if (info['faculty'] === "Teacher") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TeacherCollection);
+            } else if (info['faculty'] === "TA") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TACollection);
+            } else if (info['faculty'] === "qualified Teacher or TA") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TeacherTACollection);
+            }
 
-        publishMessage(chosen, confirmation(chosen, info));
+            
+
+            publishMessage(chosen, confirmation(chosen, info));
+        } else {
+            deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
+            info['deadline'] = deadline;
+            plannedScheduler(info);
+        }
     })
 }; 
 
@@ -393,28 +392,32 @@ async function deleteScheduler(msg1, msg2) {
 async function fetchInterested(id, msgTs) {
     console.log("Message: " + msgTs + " & Channel: " + id);
     try {
-      // Call the conversations.history method using the built-in WebClient
-      const result = await app.client.conversations.history({
-        token: process.env.SLACK_BOT_TOKEN,
-        channel: id,
-        latest: msgTs,
-        inclusive: true,
-        limit: 1
-      });
-  
-      // There should only be one result (stored in the zeroth index)
-      message = result.messages[0];
+        // Call the conversations.history method using the built-in WebClient
+        const result = await app.client.conversations.history({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: id,
+            latest: msgTs,
+            inclusive: true,
+            limit: 1
+        });
 
-      console.log(message);
-      console.log(message['reactions']);
-      reactArr = message['reactions'];
-      for (let i = 0; i < reactArr.length; i++) {
-          if (reactArr[i]['name'] === 'eyes') {
-              console.log(reactArr[i]['users']);
-              users = reactArr[i]['users'];
-              return await users;
-          }
-      }
+        // There should only be one result (stored in the zeroth index)
+        message = result.messages[0];
+
+        console.log(message);
+        console.log(message['reactions']);
+        reactArr = message['reactions'];
+        if ( typeof reactArr !== 'undefined') {
+            for (let i = 0; i < reactArr.length; i++) {
+                if (reactArr[i]['name'] === 'eyes') {
+                    console.log(reactArr[i]['users']);
+                    users = reactArr[i]['users'];
+                    return await users;
+                }
+            }
+        } else {
+            return reactArr; 
+        }
     }
     catch (error) {
       console.error(error);

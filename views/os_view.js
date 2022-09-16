@@ -42,6 +42,10 @@ function osView(today) {
                 "block_id": "link",
                 "element": {
                     "type": "plain_text_input",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Paste AV Link to Session Here "
+                    },
                     "action_id": "link_input",
                 },
                 "label": {
@@ -211,7 +215,7 @@ function osView(today) {
                         {
                             "text": {
                                 "type": "plain_text",
-                                "text": "qualified Teacher or TA",
+                                "text": "Qualified Teacher or TA",
                                 "emoji": false
                             },
                             "value": "qualified Teacher or TA"

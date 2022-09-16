@@ -42,6 +42,10 @@ function cohortView(today) {
                 "block_id": "link",
                 "element": {
                     "type": "plain_text_input",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Paste AV Link to Session Here "
+                    },
                     "action_id": "link_input",
                 },
                 "label": {
