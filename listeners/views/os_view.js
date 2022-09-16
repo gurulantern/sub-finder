@@ -198,7 +198,7 @@ function osView(today) {
                                 "text": "Teacher",
                                 "emoji": false
                             },
-                            "value": "a Teacher"
+                            "value": "Teacher"
                         },
                         {
                             "text": {
@@ -206,15 +206,15 @@ function osView(today) {
                                 "text": "TA",
                                 "emoji": false
                             },
-                            "value": "a TA"
+                            "value": "TA"
                         },
                         {
                             "text": {
                                 "type": "plain_text",
-                                "text": "Either Teacher or TA",
+                                "text": "qualified Teacher or TA",
                                 "emoji": false
                             },
-                            "value": "either a Teacher or TA"
+                            "value": "qualified Teacher or TA"
                         }
                     ]
                 }

@@ -1,12 +1,12 @@
 const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
 const { scheduleJob } = require('node-schedule');
-const { MongoClient } = require('mongodb');
+const { MongoClient, CURSOR_FLAGS } = require('mongodb');
 const { firstView } = require('./listeners/views/firstView');
 const { cohortView } = require('./listeners/views/cohort_view');
 const { osView } = require('./listeners/views/os_view');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./listeners/views/posts');
-const { urgentModal, resolvedModal } = require('./listeners/views/urgent_modal');
+const { plannedModal, dateBlocks, urgentModal, resolvedModal } = require('./listeners/views/post_modals');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -14,6 +14,15 @@ var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "planned-absences";
 const urgent = "urgent-issues";
+
+/*
+//MongoDB variables
+const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
+const client = new MongoClient(uri, {
+    connectTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 5000
+});
+*/
 
 // Initializes your app with your bot token, app token, setting it to socket mode for local dev and signing secret
 const app = new App({
@@ -23,16 +32,6 @@ const app = new App({
     appToken: process.env.SLACK_APP_TOKEN,
     logLevel: LogLevel.DEBUG
   });
-/*
-async function messageParser(message){
-    let subInfo = {
-        userId: ,
-        session: ,
-        game: ,
-        time:
-    }
-}
-*/
 
 Date.prototype.today = function () { 
     return this.getFullYear() + "-" + (this.getMonth()+1) + "-" + ((this.getDate() < 10)?"0":"") + this.getDate();
@@ -143,20 +142,35 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
 
     console.log(body);
     message = body['message']['text'];
+    chosen = body['user']['id'];
 
-    try {
-        //Call open method for view with client
-        const result = await client.chat.update({
-            token: process.env.SLACK_BOT_TOKEN,
-            channel: body['container']['channel_id'],
-            ts: body['message']['ts'],
-            text: message,
-            blocks: resolvedModal(body['user']['id'], body['message']['text'])
-        });
-        logger.info(result);
-    }
-    catch (error) {
-        logger.error(error);
+    let infoArr = body['actions'][0]['value'].split(",");
+    let subReqInfo = {
+        userId: infoArr[0],
+        session: infoArr[1],
+        game: infoArr[2],
+        time: infoArr[3],
+        link: infoArr[4],
+        faculty: infoArr[5]
+    }    
+
+    if (chosen !== subReqInfo['userId']) {
+        try {
+            //Call open method for view with client
+            const result = await client.chat.update({
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: body['container']['channel_id'],
+                ts: body['message']['ts'],
+                text: message,
+                blocks: resolvedModal(body['user']['id'], body['message']['text'])
+            });
+
+            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo));
+            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo));
+        }
+        catch (error) {
+            logger.error(error);
+        }
     }
 })
 
@@ -279,7 +293,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
-        let msgTs = await publishMessage(channel, message);
+        let msgTs = await publishMessage(channel, message, blocks);
         console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
 
         subReqInfo['deadline'] = deadline;
@@ -309,13 +323,13 @@ async function plannedScheduler(info) {
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
 
-        if (info['faculty'] === "a Teacher") {
+        if (info['faculty'] === "Teacher") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TeacherCollection);
-        } else if (info['faculty'] === "a TA") {
+        } else if (info['faculty'] === "TA") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TACollection);
-        } else if (info['faculty'] === "either a Teacher or a TA") {
+        } else if (info['faculty'] === "qualified Teacher or TA") {
             console.log(interestArr);
             chosen = await selectSub(interestArr, TeacherTACollection);
         }
@@ -494,12 +508,6 @@ async function selectSub(interested, faculty) {
 function urgentSelect(user) {
     publishMessage(findConversation(urgent), urgentConfirmation(chosen, info));
 }
-
-// Listens to incoming messages that contain "any characters"
-//app.message(/[\s\S]*/g, async ({ message, say }) => {
-    // say() sends a message to the channel that they cannot post here but can request using "/substitute"
-//    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
-//});
 
 (async () => {
   // Start your app

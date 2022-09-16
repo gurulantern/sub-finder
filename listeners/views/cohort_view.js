@@ -201,7 +201,7 @@ function cohortView(today) {
                                 "text": "Teacher",
                                 "emoji": false
                             },
-                            "value": "a Teacher"
+                            "value": "Teacher"
                         },
                         {
                             "text": {
@@ -209,7 +209,7 @@ function cohortView(today) {
                                 "text": "TA",
                                 "emoji": false
                             },
-                            "value": "a TA"
+                            "value": "TA"
                         }
                     ]
                 }

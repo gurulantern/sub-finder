@@ -1,3 +1,27 @@
+function plannedModal (msg, dateBlocks) {
+    block = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": msg
+            }
+        }
+    ];
+
+    for (i = 0; i < dateBlocks.length; i++) {
+        block.push(dateBlocks[i]);
+    }
+
+    return block;
+}
+
+function dateBlocks (info) {
+    
+
+    return dateArray
+}
+
 function urgentModal (msg, value) {
     block = [
         {
@@ -47,4 +71,4 @@ function resolvedModal(user, msg) {
     return resolved;
 }
 
-module.exports = { urgentModal, resolvedModal };
+module.exports = { plannedModal, dateBlocks, urgentModal, resolvedModal };
