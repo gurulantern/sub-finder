@@ -3,7 +3,7 @@ function plannedPost(info){
 }
 
 function urgentPost(info){
-    return `*SUBSTITUTE REQUEST*:\n\n <@${info['userId']}> needs *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* at *${info['time']} PDT*.`;
+    return `*SUBSTITUTE REQUEST*:\n\n\ <@${info['userId']}> needs *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* at *${info['time']} PDT*.`;
 }
 
 function confirmation(chosenId, info){

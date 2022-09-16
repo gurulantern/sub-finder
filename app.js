@@ -141,6 +141,7 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
 
+    console.log(body);
     message = body['message']['text'];
 
     try {
@@ -150,7 +151,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
             channel: body['container']['channel_id'],
             ts: body['message']['ts'],
             text: message,
-            blocks: resolvedModal(body['message']['text'])
+            blocks: resolvedModal(body['user']['id'], body['message']['text'])
         });
         logger.info(result);
     }
@@ -261,7 +262,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
-        let msgTs = await publishMessage(channel, message);
+        let msgTs = await publishMessage(channel, message, blocks);
         console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
 
         subReqInfo['deadline'] = deadline;
@@ -499,38 +500,6 @@ function urgentSelect(user) {
     // say() sends a message to the channel that they cannot post here but can request using "/substitute"
 //    await say(`Hey there <@${message.user}>! You can submit a sub request using the slash command: '/substitute' in any Message Box.`);
 //});
-
-
-app.event('reaction_added', async ({ event }) => {
-    console.log(event);
-    let message = {};
-    let reactArr = [];
-    let chosen = "";
-    try {
-        if (await findConversation(urgent) === event['item']['channel']) {
-            message = await app.client.conversations.history({
-                token: process.env.SLACK_BOT_TOKEN,
-                channel: event['item']['channel'],
-                latest: event['item']['ts'],
-                inclusive: true,
-                limit: 1
-            })
-            console.log(message);
-            let msgText = message['messages']['text'];
-            reactArr = message['messages'][0]['reactions'];
-            for (let i = 0; i < reactArr.length; i ++) {
-                if (reactArr[i]['name'] === 'eyes') {
-                    if (reactArr[i]['count'] === 1) {
-                        chosen = reactArr[i]['users'][0];
-                        console.log("Urgent Chosen: " + chosen);
-                    }
-                }
-            }
-        } 
-    } catch (e) {
-        console.error(e);
-    }
-});
 
 (async () => {
   // Start your app

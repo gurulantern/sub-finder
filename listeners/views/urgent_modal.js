@@ -26,7 +26,7 @@ function urgentModal (msg, value) {
     return block;
 }
 
-function resolvedModal(msg) { 
+function resolvedModal(user, msg) { 
     resolved = [
         {
             "type": "section",
@@ -39,7 +39,7 @@ function resolvedModal(msg) {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": ":arrow_up:---- *RESOLVED* ----:arrow_up:"
+                "text": `:arrow_up:---- *RESOLVED by <@${user}>* ----:arrow_up:`
             }
         }
     ];
