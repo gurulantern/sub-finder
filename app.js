@@ -5,7 +5,8 @@ const { MongoClient } = require('mongodb');
 const { firstView } = require('./listeners/views/firstView');
 const { cohortView } = require('./listeners/views/cohort_view');
 const { osView } = require('./listeners/views/os_view');
-const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, confirmation, notification } = require('./listeners/views/posts');
+const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./listeners/views/posts');
+const { urgentModal, resolvedModal } = require('./listeners/views/urgent_modal');
 require("dotenv").config();
 
 var TeacherCollection = new Map();
@@ -72,12 +73,13 @@ async function findConversation(name) {
  * @param {*} text The text of the message sent
  * @returns The result of the message posted
  */
-async function publishMessage(id, text) {
+async function publishMessage(id, text, blocks) {
     try {
         const result = await app.client.chat.postMessage({
             token: process.env.SLACK_BOT_TOKEN,
             channel: id,
-            text: text
+            text: text,
+            blocks: blocks
         });
         messageTs = result['message']['ts'];
         return await result['message']['ts'];
@@ -136,6 +138,27 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
     }
 })
 
+app.action("urgent_assist", async ({ body, ack, client, logger }) => {
+    await ack();
+
+    message = body['message']['text'];
+
+    try {
+        //Call open method for view with client
+        const result = await client.chat.update({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: body['container']['channel_id'],
+            ts: body['message']['ts'],
+            text: message,
+            blocks: resolvedModal(body['message']['text'])
+        });
+        logger.info(result);
+    }
+    catch (error) {
+        logger.error(error);
+    }
+})
+
 //Listener for submission of request
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
@@ -143,6 +166,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let userTZ = "America/Los_Angeles";
     let channel = "";
     let msgTs = "";
+    let blocks = [];
     //let facultyInput = "";
     let sessionInput = "";
     var currDateTime = new Date().today() + "T" + new Date().timeNow();
@@ -216,10 +240,15 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     
     //Check how close the request is made to the time of session
     if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -60) {
-        message = urgentPost(subReqInfo)
+        message = urgentPost(subReqInfo);
+        values = urgentValues(subReqInfo);
+        blocks = urgentModal(message, values);
+        console.log("Message: " + message);
+        console.log("Value: " + values);
+        console.log("Block: " + blocks);
 
         channel = await findConversation(urgent);
-        let msgTs = await publishMessage(channel, message);
+        let msgTs = await publishMessage(channel, message, blocks);
         logger.info("URGENT POSTING in " + channel + " " + msgTs);
     
         subReqInfo['msgTs'] = msgTs;
