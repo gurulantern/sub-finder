@@ -12,8 +12,8 @@ require("dotenv").config();
 var TeacherCollection = new Map();
 var TACollection = new Map();
 var TeacherTACollection = new Map();
-const planned = "planned-absences";
-const urgent = "urgent-issues";
+const planned = "admin-planned-absences";
+const urgent = "admin-urgent-issues";
 
 
 /*
@@ -150,7 +150,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     console.log(infoArr);
     console.log(subReqInfo);
 
-    //if (chosen === subReqInfo['userId']) {
+    if (chosen !== subReqInfo['userId']) {
         try {
             //Call open method for view with client
             const result = await client.chat.update({
@@ -167,7 +167,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
         catch (error) {
             logger.error(error);
         }
-    //}
+    }
 })
 
 //Listener for submission of request
@@ -313,6 +313,7 @@ async function plannedScheduler(info) {
 
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         let chosen;
+        let message;
         console.log("Planned Job is firing");
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
@@ -329,9 +330,41 @@ async function plannedScheduler(info) {
                 chosen = await selectSub(interestArr, TeacherTACollection);
             }
 
-            
+            try {
+                // Call the conversations.history method using the built-in WebClient
+                const result = await app.client.conversations.history({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: info['channel'],
+                    latest: info['msgTs'],
+                    inclusive: true,
+                    limit: 1
+                });
+        
+                // There should only be one result (stored in the zeroth index)
+                message = result.messages[0];
+            }
+            catch (error) {
+              console.error(error);
+            }
 
+            try {
+                console.log("Message: " + message.text);
+                console.log("channel: " + info['channel']);
+                //Call open method for view with client
+                const result = await app.client.chat.update({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: info['channel'],
+                    ts: info['msgTs'],
+                    text: message.text,
+                    blocks: resolvedModal(chosen, message.text)
+                });
+            }
+            catch (error) {
+                console.error(error);
+            }
+    
             publishMessage(chosen, confirmation(chosen, info));
+            publishMessage(info['userId'], notification(chosen, info));
         } else {
             deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
             info['deadline'] = deadline;
