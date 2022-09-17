@@ -5,6 +5,7 @@ const { MongoClient, CURSOR_FLAGS } = require('mongodb');
 const { firstView } = require('./views/first_view');
 const { cohortView } = require('./views/cohort_view');
 const { osView } = require('./views/os_view');
+const { plannedJob } = require('./plan_schedule');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./views/posts');
 const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
 require("dotenv").config();
@@ -79,6 +80,32 @@ async function publishMessage(id, text, blocks) {
     catch (error) {
         console.log(error);
     }
+}
+
+function semiInterval(info) {
+    let preUrgent = DateTime.fromISO(info['ISO']);
+    let diffObj = preUrgent.diffNow('minutes').toObject();
+    console.log("SemiDiff: " + diffObj['minutes'] );
+    timeToDeadline = diffObj['minutes']/2;
+    return timeToDeadline;
+}
+
+function isPreUrgent(info) {
+    let preUrgent = DateTime.fromISO(info['ISO']);
+    let diffObj = preUrgent.diffNow('minutes').toObject();
+    if (diffObj['minutes'] <= 5 && diffObj['minutes'] > 1.5) {
+        return true;
+    }
+    return false;
+}
+
+function isUrgent(info) {
+    let urgent = DateTime.fromISO(info['ISO']);
+    let diffObj = urgent.diffNow('minutes').toObject();
+    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -30) {
+        return true;
+    }
+    return false;
 }
 
 //Command logic for the shortcut message /substitute
@@ -170,6 +197,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     }
 })
 
+
 //Listener for submission of request
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
@@ -235,22 +263,30 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     })
 
     //Create a DateTime in PDT and set post Locale Strings for post in planned-absence
-    pst = dateTime.setZone("America/Los_Angeles");
+    pdt = dateTime.setZone("America/Los_Angeles");
     logger.info("User's TZ: " + dateTime.toLocaleString(DateTime.DATETIME_FULL));
-    logger.info("PDT: " + pst.toLocaleString(DateTime.DATETIME_FULL))
-    let msgDate = pst.toLocaleString(DateTime.DATE_HUGE);
-    let msgTime = pst.toLocaleString(DateTime.TIME_SIMPLE);
+    logger.info("PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL))
+    let msgDate = pdt.toLocaleString(DateTime.DATE_HUGE);
+    let msgTime = pdt.toLocaleString(DateTime.TIME_SIMPLE);
     
     subReqInfo['date'] = msgDate;
     subReqInfo['time'] = msgTime;
 
     let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
     console.log("Now:" + now);
-    let diffObj = pst.diffNow( 'minutes').toObject(); 
+    /*
+    let preUrgent = pdt.minus({ minutes: 1.5 });
+    let diffObj = preUrgent.diffNow( 'minutes').toObject(); 
+
+    subReqInfo['ISO'] = preUrgent.toISO();
+    */
+    let diffObj = pdt.diffNow('minutes').toObject();
+    subReqInfo['ISO'] = pdt.toISO();
+
     console.log(diffObj);
     
     //Check how close the request is made to the time of session
-    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -60) {
+    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -30) {
         message = urgentPost(subReqInfo);
         values = urgentValues(subReqInfo);
         blocks = urgentModal(message, values, subReqInfo['link']);
@@ -266,14 +302,14 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         subReqInfo['channel'] = channel;
     
         console.log(subReqInfo);
-    } else if (diffObj['minutes'] > 10) {
+    } else if (diffObj['minutes'] > 5) {
         //Await for the conversation and the message to publish
         deadline = DateTime.now().plus({ minutes: 2 }).toJSDate();
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
-        console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
+        console.log("Posting Planned Req in " + channel + " " + msgTs);
 
         subReqInfo['deadline'] = deadline;
         subReqInfo['msgTs'] = msgTs;
@@ -283,14 +319,15 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         //Use awaited return values to schedule a job to sort interested parties
 
         plannedScheduler(subReqInfo);  
-    } else if (diffObj['minutes'] <= 10 && diffObj['minutes'] > 1.5) {
+    } else if (diffObj['minutes'] <= 5 && diffObj['minutes'] > 1.5) {
         //Await for the conversation and the message to publish
-        deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
+        console.log(diffObj['minutes']/2);
+        deadline = DateTime.now().plus({ minutes: semiInterval(subReqInfo) }).toJSDate();
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
-        console.log("Out of publish and b4 schedule " + channel + " " + msgTs);
+        console.log("Post SemiPlanned in " + channel + " " + msgTs);
 
         subReqInfo['deadline'] = deadline;
         subReqInfo['msgTs'] = msgTs;
@@ -298,27 +335,19 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
         console.log(subReqInfo);
         //Use awaited return values to schedule a job to sort interested parties
-
-        semiPlannedscheduler(subReqInfo);          
+        semiPlannedScheduler(subReqInfo);          
     }
 });
 
-async function urgentScheduler(info) {
-    
-    
-    scheduleJob()
-}
-
 async function plannedScheduler(info) {
-
     scheduleJob(info['msgTs'], info['deadline'], async () => {
-        let chosen;
-        let message;
         console.log("Planned Job is firing");
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
 
         if (typeof interestArr !== "undefined") {
+            let chosen;
+            let message;
             if (info['faculty'] === "Teacher") {
                 console.log(interestArr);
                 chosen = await selectSub(interestArr, TeacherCollection);
@@ -329,7 +358,7 @@ async function plannedScheduler(info) {
                 console.log(interestArr);
                 chosen = await selectSub(interestArr, TeacherTACollection);
             }
-
+        
             try {
                 // Call the conversations.history method using the built-in WebClient
                 const result = await app.client.conversations.history({
@@ -344,9 +373,9 @@ async function plannedScheduler(info) {
                 message = result.messages[0];
             }
             catch (error) {
-              console.error(error);
+                console.error(error);
             }
-
+        
             try {
                 console.log("Message: " + message.text);
                 console.log("channel: " + info['channel']);
@@ -362,9 +391,13 @@ async function plannedScheduler(info) {
             catch (error) {
                 console.error(error);
             }
-    
+        
             publishMessage(chosen, confirmation(chosen, info));
             publishMessage(info['userId'], notification(chosen, info));
+        } else if (isPreUrgent(info)) {
+            deadline = DateTime.now().plus({ minutes: semiInterval(info) }).toJSDate();
+            info['deadline'] = deadline;
+            semiPlannedScheduler(info);
         } else {
             deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
             info['deadline'] = deadline;
@@ -374,48 +407,90 @@ async function plannedScheduler(info) {
 }; 
 
 async function semiPlannedScheduler(info) {
+    scheduleJob(info['msgTs'], info['deadline'], async () => {
+        console.log("SemiPlanned Job is firing");
+        let interestArr = await fetchInterested(info['channel'], info['msgTs']);
+        console.log(interestArr);
 
-
-}
-/*
-async function deleteMsg(msg) {
-    try {
-        // Call the conversations.history method using the built-in WebClient
-        const result = await app.client.conversations.history({
-          token: process.env.SLACK_BOT_TOKEN,
-          channel: id,
-          latest: msg1,
-          inclusive: true,
-          limit: 1
-        });
-    
-        // There should only be one result (stored in the zeroth index)
-        message = result.messages[0];
-  
-        console.log(message);
-        console.log(message['reactions']);
-        reactArr = message['reactions'];
-        for (let i = 0; i < reactArr.length; i++) {
-            if (reactArr[i]['name'] === 'eyes') {
-                console.log(reactArr[i]['users']);
-                users = reactArr[i]['users'];
-                return await users;
+        if (typeof interestArr !== "undefined") {
+            let chosen;
+            let message;
+            if (info['faculty'] === "Teacher") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TeacherCollection);
+            } else if (info['faculty'] === "TA") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TACollection);
+            } else if (info['faculty'] === "qualified Teacher or TA") {
+                console.log(interestArr);
+                chosen = await selectSub(interestArr, TeacherTACollection);
             }
-        }
-    }
-    catch (error) {
-        console.error(error);
-    }
-    console.log(msg + " deleted.");
-}
-async function deleteScheduler(msg1, msg2) {
+        
+            try {
+                // Call the conversations.history method using the built-in WebClient
+                const result = await app.client.conversations.history({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: info['channel'],
+                    latest: info['msgTs'],
+                    inclusive: true,
+                    limit: 1
+                });
+        
+                // There should only be one result (stored in the zeroth index)
+                message = result.messages[0];
+            }
+            catch (error) {
+                console.error(error);
+            }
+        
+            try {
+                console.log("Message: " + message.text);
+                console.log("channel: " + info['channel']);
+                //Call open method for view with client
+                const result = await app.client.chat.update({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: info['channel'],
+                    ts: info['msgTs'],
+                    text: message.text,
+                    blocks: resolvedModal(chosen, message.text)
+                });
+            }
+            catch (error) {
+                console.error(error);
+            }
+        
+            publishMessage(chosen, confirmation(chosen, info));
+            publishMessage(info['userId'], notification(chosen, info));
+        } else if (isUrgent(info)) {
+            const result = await app.client.chat.delete({
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: await findConversation(planned),
+                ts: info['msgTs']
+            });
 
-    scheduleJob( , async () => {
-        await deleteMsg(msg1);
-        await deleteMsg(msg2);    
+            message = urgentPost(info);
+            values = urgentValues(info);
+            blocks = urgentModal(message, values, info['link']);
+            console.log("Message: " + message);
+            console.log("Value: " + values);
+            console.log("Block: " + blocks);
+    
+            channel = await findConversation(urgent);
+            let msgTs = await publishMessage(channel, message, blocks);
+            console.log("URGENT POSTING in " + channel + " " + msgTs);
+        
+            info['msgTs'] = msgTs;
+            info['channel'] = channel;
+        
+            console.log(info);
+        } else {
+            deadline = DateTime.now().plus({ minutes: semiInterval(info) }).toJSDate();
+            info['deadline'] = deadline;
+            semiPlannedScheduler(info);
+        }
     })
 }
-*/
+
 /**
  * 
  * @param {*} id The channel id to search for the required message
@@ -544,13 +619,9 @@ async function selectSub(interested, faculty) {
     return await facultyGetter(choices, faculty);
 }
 
-function urgentSelect(user) {
-    publishMessage(findConversation(urgent), urgentConfirmation(chosen, info));
-}
-
 (async () => {
   // Start your app
   await app.start(process.env.PORT || 3000);
 
-  console.log('⚡️ Bolt app is running!');
+  console.log("⚡️ LET'S FIND SUBSTITUTES!");
 })();
