@@ -26,7 +26,7 @@ const client = new MongoClient(uri, {
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
         console.log("Monthly Reset Job is firing");
-        TeacherTACollection.forEach(count, userId, () => {
+        TeacherTACollection.forEach(function(count, userId) {
             if(count <= 0 ) {
                 count --;
             } else if (count > 0) {
@@ -45,7 +45,7 @@ function counter(chosen, num, value) {
     console.log(chosen + " is at " + TeacherTACollection.get(chosen));
     console.log("---------------------------");
     console.log("Updated faculty collection");
-    TeacherTACollection.forEach(user, userId => { console.log("{ " + userId + " : " + user + " }") });
+    TeacherTACollection.forEach(function(count, userId) { console.log("{ " + userId + " : " + count + " }") });
 }
 
 function deadlineSetter(time) {
@@ -111,7 +111,7 @@ async function publishMessage(id, text, blocks) {
 function semiInterval(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
-    console.log("SemiDiff: " + (diffObj['minutes']  - 1) );
+    console.log("Time til Urgent(minutes): " + (diffObj['minutes']  - 1) );
     timeToDeadline = (diffObj['minutes'] - 1)/2;
     return timeToDeadline;
 }
@@ -119,7 +119,7 @@ function semiInterval(info) {
 function isPreUrgent(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
+    if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1.15) {
         return true;
     }
     return false;
@@ -128,7 +128,7 @@ function isPreUrgent(info) {
 function isUrgent(info) {
     let urgent = DateTime.fromISO(info['ISO']);
     let diffObj = urgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
+    if (diffObj['minutes'] <= 1.15 && diffObj['minutes'] >= -30) {
         return true;
     }
     return false;
@@ -440,7 +440,8 @@ async function semiPlannedScheduler(info) {
         console.log("Now:" + now);
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
-
+        console.log(isUrgent(info));
+        console.log(info);
         if (typeof interestArr !== "undefined") {
             let chosen;
             let message;
