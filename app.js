@@ -10,8 +10,6 @@ const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentV
 const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
 require("dotenv").config();
 
-var TeacherCollection = new Map();
-var TACollection = new Map();
 var TeacherTACollection = new Map();
 const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
@@ -25,6 +23,35 @@ const client = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000
 });
 */
+async function monthlyReset(deadline) {
+    scheduleJob(deadline, async () => {
+        console.log("Monthly Reset Job is firing");
+        TeacherTACollection.forEach(count, userId, () => {
+            if(count <= 0 ) {
+                count --;
+            } else if (count > 0) {
+                count = 0;
+            }
+
+            console.log("{" + userId + " : " + count + " }");
+        })
+    })
+}
+
+monthlyReset(DateTime.now().plus({ minutes: 8 }).toJSDate());
+
+function counter(chosen, num, value) {
+    TeacherTACollection.set(chosen, num + value);
+    console.log(chosen + " is at " + TeacherTACollection.get(chosen));
+    console.log("---------------------------");
+    console.log("Updated faculty collection");
+    TeacherTACollection.forEach(user, userId => { console.log("{ " + userId + " : " + user + " }") });
+}
+
+function deadlineSetter(time) {
+    deadline = DateTime.now().plus({ minutes: time }).toJSDate();
+    return deadline;
+}
 
 // Initializes your app with your bot token, app token, setting it to socket mode for local dev and signing secret
 const app = new App({
@@ -53,9 +80,8 @@ async function findConversation(name) {
 
         for (const channel of result.channels) {
             if (channel.name === name) {
-                console.log("Found conversation ID " + channel.id);
+                //console.log("Found conversation ID " + channel.id);
                 channelId = channel.id;
-                console.log(channelId);
                 return await channel.id;
             }
         }
@@ -85,15 +111,15 @@ async function publishMessage(id, text, blocks) {
 function semiInterval(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
-    console.log("SemiDiff: " + diffObj['minutes'] );
-    timeToDeadline = diffObj['minutes']/2;
+    console.log("SemiDiff: " + (diffObj['minutes']  - 1) );
+    timeToDeadline = (diffObj['minutes'] - 1)/2;
     return timeToDeadline;
 }
 
 function isPreUrgent(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 5 && diffObj['minutes'] > 1.5) {
+    if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
         return true;
     }
     return false;
@@ -102,7 +128,7 @@ function isPreUrgent(info) {
 function isUrgent(info) {
     let urgent = DateTime.fromISO(info['ISO']);
     let diffObj = urgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -30) {
+    if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
         return true;
     }
     return false;
@@ -160,9 +186,13 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
 
-    console.log(body);
+    //console.log(body);
     message = body['message']['text'];
     chosen = body['user']['id'];
+
+    if (!TeacherTACollection.has(chosen)) {
+        TeacherTACollection.set(chosen, 0);
+    }
 
     let infoArr = body['actions'][0]['value'].split(",");
     let subReqInfo = {
@@ -173,11 +203,11 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
         link: infoArr[4],
         faculty: infoArr[5]
     }    
-    console.log(body['actions'][0]['value']);
-    console.log(infoArr);
-    console.log(subReqInfo);
+    //console.log(body['actions'][0]['value']);
+    //console.log(infoArr);
+    //console.log(subReqInfo);
 
-    if (chosen !== subReqInfo['userId']) {
+    //if (chosen !== subReqInfo['userId']) {
         try {
             //Call open method for view with client
             const result = await client.chat.update({
@@ -190,11 +220,13 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
 
             publishMessage(chosen, urgentConfirmation(chosen, subReqInfo), messageModal(urgentConfirmation(chosen, subReqInfo)));
             publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), messageModal(urgentNotification(chosen, subReqInfo)));
+        
+            counter(chosen, TeacherTACollection.get(chosen), 1);
         }
         catch (error) {
             logger.error(error);
         }
-    }
+    //}
 })
 
 
@@ -231,7 +263,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         time: view['state']['values']['time']['time_input']['selected_time'],
         faculty: view['state']['values']['faculty']['faculty_input']['selected_option']['value']
     }
-    console.log(subReqInfo);
+    //console.log(subReqInfo);
 
     //Fetch user's TZ
     try {
@@ -239,9 +271,8 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
             user: subReqInfo['userId']
         })
 
-        console.log(result);
         userTZ = result['user']['tz'];
-        console.log("User TZ : "+ userTZ);
+        //console.log("User TZ : "+ userTZ);
     }
     catch (error){
         console.error(error);
@@ -274,19 +305,15 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
     let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
     console.log("Now:" + now);
-    /*
-    let preUrgent = pdt.minus({ minutes: 1.5 });
-    let diffObj = preUrgent.diffNow( 'minutes').toObject(); 
-
-    subReqInfo['ISO'] = preUrgent.toISO();
-    */
+    
     let diffObj = pdt.diffNow('minutes').toObject();
     subReqInfo['ISO'] = pdt.toISO();
 
+    console.log("Time til session: ");
     console.log(diffObj);
     
-    //Check how close the request is made to the time of session
-    if (diffObj['minutes'] <= 1.5 && diffObj['minutes'] >= -30) {
+    //URGENT -- Check how close the request is made to the time of session
+    if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
         message = urgentPost(subReqInfo);
         values = urgentValues(subReqInfo);
         blocks = urgentModal(message, values, subReqInfo['link']);
@@ -296,44 +323,44 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
         channel = await findConversation(urgent);
         let msgTs = await publishMessage(channel, message, blocks);
-        logger.info("URGENT POSTING in " + channel + " " + msgTs);
+        //logger.info("URGENT POSTING in " + channel + " " + msgTs);
     
         subReqInfo['msgTs'] = msgTs;
         subReqInfo['channel'] = channel;
     
-        console.log(subReqInfo);
-    } else if (diffObj['minutes'] > 5) {
+        //console.log(subReqInfo);
+    //PLANNED 
+    } else if (diffObj['minutes'] > 3) {
         //Await for the conversation and the message to publish
-        deadline = DateTime.now().plus({ minutes: 2 }).toJSDate();
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
         console.log("Posting Planned Req in " + channel + " " + msgTs);
 
-        subReqInfo['deadline'] = deadline;
+        subReqInfo['deadline'] = deadlineSetter(1);
         subReqInfo['msgTs'] = msgTs;
         subReqInfo['channel'] = channel;
 
-        console.log(subReqInfo);
+        //console.log(subReqInfo);
         //Use awaited return values to schedule a job to sort interested parties
 
-        plannedScheduler(subReqInfo);  
-    } else if (diffObj['minutes'] <= 5 && diffObj['minutes'] > 1.5) {
+        plannedScheduler(subReqInfo);
+    //SEMIPLANNED  
+    } else if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
         //Await for the conversation and the message to publish
-        console.log(diffObj['minutes']/2);
-        deadline = DateTime.now().plus({ minutes: semiInterval(subReqInfo) }).toJSDate();
+        console.log((diffObj['minutes']/2) -1);
         message = plannedPost(subReqInfo);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
         console.log("Post SemiPlanned in " + channel + " " + msgTs);
 
-        subReqInfo['deadline'] = deadline;
+        subReqInfo['deadline'] = deadlineSetter(semiInterval(subReqInfo));
         subReqInfo['msgTs'] = msgTs;
         subReqInfo['channel'] = channel;
 
-        console.log(subReqInfo);
+        //console.log(subReqInfo);
         //Use awaited return values to schedule a job to sort interested parties
         semiPlannedScheduler(subReqInfo);          
     }
@@ -342,21 +369,23 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 async function plannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("Planned Job is firing");
+        let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
+        console.log("Now:" + now);
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
-        console.log(interestArr);
+        //console.log(interestArr);
 
         if (typeof interestArr !== "undefined") {
             let chosen;
             let message;
             if (info['faculty'] === "Teacher") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TeacherCollection);
+                chosen = await selectSub(interestArr);
             } else if (info['faculty'] === "TA") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TACollection);
+                chosen = await selectSub(interestArr);
             } else if (info['faculty'] === "qualified Teacher or TA") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TeacherTACollection);
+                chosen = await selectSub(interestArr);
             }
         
             try {
@@ -377,8 +406,8 @@ async function plannedScheduler(info) {
             }
         
             try {
-                console.log("Message: " + message.text);
-                console.log("channel: " + info['channel']);
+                //console.log("Message: " + message.text);
+                //console.log("channel: " + info['channel']);
                 //Call open method for view with client
                 const result = await app.client.chat.update({
                     token: process.env.SLACK_BOT_TOKEN,
@@ -395,12 +424,10 @@ async function plannedScheduler(info) {
             publishMessage(chosen, confirmation(chosen, info));
             publishMessage(info['userId'], notification(chosen, info));
         } else if (isPreUrgent(info)) {
-            deadline = DateTime.now().plus({ minutes: semiInterval(info) }).toJSDate();
-            info['deadline'] = deadline;
+            info['deadline'] = deadlineSetter(semiInterval(info));
             semiPlannedScheduler(info);
         } else {
-            deadline = DateTime.now().plus({ minutes: 1 }).toJSDate();
-            info['deadline'] = deadline;
+            info['deadline'] = deadlineSetter(1);
             plannedScheduler(info);
         }
     })
@@ -409,6 +436,8 @@ async function plannedScheduler(info) {
 async function semiPlannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("SemiPlanned Job is firing");
+        let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
+        console.log("Now:" + now);
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
         console.log(interestArr);
 
@@ -417,13 +446,13 @@ async function semiPlannedScheduler(info) {
             let message;
             if (info['faculty'] === "Teacher") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TeacherCollection);
+                chosen = await selectSub(interestArr);
             } else if (info['faculty'] === "TA") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TACollection);
+                chosen = await selectSub(interestArr);
             } else if (info['faculty'] === "qualified Teacher or TA") {
                 console.log(interestArr);
-                chosen = await selectSub(interestArr, TeacherTACollection);
+                chosen = await selectSub(interestArr);
             }
         
             try {
@@ -484,8 +513,7 @@ async function semiPlannedScheduler(info) {
         
             console.log(info);
         } else {
-            deadline = DateTime.now().plus({ minutes: semiInterval(info) }).toJSDate();
-            info['deadline'] = deadline;
+            info['deadline'] = deadlineSetter(semiInterval(info));
             semiPlannedScheduler(info);
         }
     })
@@ -498,7 +526,7 @@ async function semiPlannedScheduler(info) {
  * @returns An array of users that reacted to the post
  */
 async function fetchInterested(id, msgTs) {
-    console.log("Message: " + msgTs + " & Channel: " + id);
+    //console.log("Message: " + msgTs + " & Channel: " + id);
     try {
         // Call the conversations.history method using the built-in WebClient
         const result = await app.client.conversations.history({
@@ -512,7 +540,7 @@ async function fetchInterested(id, msgTs) {
         // There should only be one result (stored in the zeroth index)
         message = result.messages[0];
 
-        console.log(message);
+        //console.log(message);
         console.log(message['reactions']);
         reactArr = message['reactions'];
         if ( typeof reactArr !== 'undefined') {
@@ -538,11 +566,11 @@ async function fetchInterested(id, msgTs) {
  * @param {*} currentLow The current lowest amount of the subs assigned to person
  * @returns the current lowes amount of subs assigned
  */
-function findLowSub(faculty, currentLow) {
+function findLowSub(currentLow) {
     var i = 0;
 
     //Iterate through and if anything is lower than current low set that as current low
-    faculty.forEach(function (value, key) {
+    TeacherTACollection.forEach(function (value, key) {
         if (i === 0) {
             currentLow = value;
             i++;
@@ -564,7 +592,7 @@ function findLowSub(faculty, currentLow) {
  * @param {*} faculty The selected required faculty for updates to counters
  * @returns The randomly chosen interested party
  */
-function facultyGetter(choices, faculty) {
+function facultyGetter(choices) {
     //initialize empty selections and temp current low
     let selections = [];
     let currentLow = 0;
@@ -582,12 +610,8 @@ function facultyGetter(choices, faculty) {
     var chosen = selections[random];
     let num = choices.get(chosen);
 
-    //Update counter in selected Faculty map and Whole faculty map
-    console.log(chosen + " " + num);
-    faculty.set(chosen, num + 1);
-    TeacherTACollection.set(chosen, num + 1);
-    console.log(chosen + " " + faculty.get(chosen));
-    console.log(chosen + " " + TeacherTACollection.get(chosen));
+    //Update counter in selected Faculty map and Whole faculty map\
+    counter(chosen, num, 1);
 
     //empty selections
     selections.splice(0);
@@ -595,28 +619,28 @@ function facultyGetter(choices, faculty) {
     return chosen;
 };
 
+
 /**
  * 
  * @param {*} interested Array of interested faculty 
  * @param {*} faculty The map of required faculty
  * @returns chosen party for assignment
  */
-async function selectSub(interested, faculty) {
+async function selectSub(interested) {
     let choices = new Map();
     for (let i = 0; i < interested.length; i ++) {
-        if (!faculty.has(interested[i])) {
-            faculty.set(interested[i], 0);
+        if (!TeacherTACollection.has(interested[i])) {
+            //faculty.set(interested[i], 0);
             choices.set(interested[i], 0);
             TeacherTACollection.set(interested[i], 0);
         } else {
-            choices.set(interested[i], faculty[interested[i]]);
+            choices.set(interested[i], TeacherTACollection.get(interested[i]));
         }
     }
-    console.log("Faculty: " + faculty);
     console.log("Choices: " + choices);
     console.log("TeacherTACollection: " + TeacherTACollection);
 
-    return await facultyGetter(choices, faculty);
+    return await facultyGetter(choices);
 }
 
 (async () => {
