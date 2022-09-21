@@ -38,7 +38,7 @@ async function monthlyReset(deadline) {
     })
 }
 
-monthlyReset(DateTime.now().plus({ minutes: 8 }).toJSDate());
+monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
 
 function counter(chosen, num, value) {
     TeacherTACollection.set(chosen, num + value);
@@ -372,7 +372,7 @@ async function plannedScheduler(info) {
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
         let interestArr = await fetchInterested(info['channel'], info['msgTs']);
-        //console.log(interestArr);
+        console.log(interestArr);
 
         if (typeof interestArr !== "undefined") {
             let chosen;
