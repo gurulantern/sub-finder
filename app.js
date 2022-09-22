@@ -8,12 +8,50 @@ const { osView } = require('./views/os_view');
 const { plannedJob } = require('./plan_schedule');
 const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./views/posts');
 const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
+const { google } = require('googleapis');
 require("dotenv").config();
 
 var TeacherTACollection = new Map();
 const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
+//GoogleSheets login stuff
+const spreadsheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
+
+const auth = new google.auth.GoogleAuth({
+    keyFile: "credentials.json",
+    scopes: "https://www.googleapis.com/auth/spreadsheets",
+});
+
+async function getRows(auth, spreadsheetId) {
+    const getRows = await googleSheets.spreadsheets.values.get({
+        auth, 
+        spreadsheetId,
+        range: "Sheet1"
+    });
+
+    return (getRows.data.values.length + 1).toString();
+}
+
+async function updateSheet(auth, spreadsheetId, range, info) { 
+    const client = await auth.getClient();
+
+    const googleSheets = google.sheets({version: "v4", auth: client});
+
+    await googleSheets.spreadsheets.values.append({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!${range}`,
+        valueInputOption:  "USER_ENTERED",
+        resource: {
+            values: [
+                ["9/20/2022 9:00:00", "alexander.ho@synthesis.is"]
+            ]
+        }
+    })
+
+    console.log(getRows.data);
+}
 
 /*
 //MongoDB variables
@@ -498,12 +536,17 @@ async function semiPlannedScheduler(info) {
                 ts: info['msgTs']
             });
 
+            console.log("Planned Post deleted");
+
             message = urgentPost(info);
             values = urgentValues(info);
             blocks = urgentModal(message, values, info['link']);
             console.log("Message: " + message);
             console.log("Value: " + values);
-            console.log("Block: " + blocks);
+            console.log("Block: ");
+            for (let i = 0; i < blocks.length; i++) {
+                console.log(blocks[i]);
+            }
     
             channel = await findConversation(urgent);
             let msgTs = await publishMessage(channel, message, blocks);

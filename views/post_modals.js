@@ -37,6 +37,9 @@ function dateBlocks (info) {
 }
 
 function urgentModal (msg, value, link) {
+
+
+
     block = [
         {
             "type": "section",
