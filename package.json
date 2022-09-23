@@ -1,5 +1,6 @@
 {
   "name": "subfinder-bolt-app",
+  "type":"module",
   "version": "1.0.0",
   "description": "A slack app to randomly choose sub-assignments for available faculty",
   "main": "index.js",
@@ -19,6 +20,7 @@
     "jquery": "^3.6.1",
     "luxon": "^3.0.3",
     "mongodb": "^4.9.1",
+    "node-fetch": "^3.2.10",
     "node-schedule": "^2.1.0",
     "save": "^2.5.0"
   },

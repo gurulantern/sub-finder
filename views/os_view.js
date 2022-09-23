@@ -231,4 +231,4 @@ function osView(today) {
     }
 }
 
-module.exports = { osView };
+export { osView };

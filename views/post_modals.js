@@ -1,5 +1,5 @@
 function plannedModal (msg, dateBlocks) {
-    block = [
+    let block = [
         {
             "type": "section",
             "text": {
@@ -17,7 +17,7 @@ function plannedModal (msg, dateBlocks) {
 }
 
 function messageModal(msg) {
-    block = [
+    let block = [
         {
             "type": "section",
             "text": {
@@ -37,39 +37,64 @@ function dateBlocks (info) {
 }
 
 function urgentModal (msg, value, link) {
-
-
-
-    block = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": msg
-            }
-        },
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Assist"
-                    },
-                    "value": value,
-                    "action_id": "urgent_assist",
-                    "url": link,
+    console.log("LINK:")
+    console.log(link);
+    let block;
+    if (link === "working link not provided") {
+        block = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": msg
                 }
-            ]
-        }
-    ];
-
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Assist"
+                        },
+                        "value": value,
+                        "action_id": "urgent_assist",
+                    }
+                ]
+            }
+        ];
+    } else {
+        block = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": msg
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Assist"
+                        },
+                        "value": value,
+                        "action_id": "urgent_assist",
+                        "url": link,
+                    }
+                ]
+            }
+        ];
+    }
     return block;
 }
 
 function resolvedModal(user, msg) { 
-    resolved = [
+    let resolved = [
         {
             "type": "section",
             "text": {
@@ -89,4 +114,4 @@ function resolvedModal(user, msg) {
     return resolved;
 }
 
-module.exports = { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal };
+export { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal };

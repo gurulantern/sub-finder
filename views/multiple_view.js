@@ -68,4 +68,4 @@ const multipleView = {
 	]
 }
 
-module.exports = { multipleView };
+export { multipleView };

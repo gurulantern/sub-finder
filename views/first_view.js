@@ -39,4 +39,4 @@ const firstView = {
 	]
 }
 
-module.exports = { firstView };
+export { firstView };

@@ -226,4 +226,4 @@ function cohortView(today) {
     }
 }
 
-module.exports = { cohortView };
+export { cohortView };

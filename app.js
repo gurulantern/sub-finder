@@ -1,3 +1,4 @@
+/*
 const { App, LogLevel } = require('@slack/bolt');
 const { DateTime } = require('luxon');
 const { scheduleJob }  = require('node-schedule');
@@ -10,6 +11,22 @@ const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentV
 const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
 const { google } = require('googleapis');
 require("dotenv").config();
+*/
+
+import pkg from '@slack/bolt';
+const { App, LogLevel } = pkg;
+import { DateTime } from 'luxon';
+import { scheduleJob } from 'node-schedule';
+import { firstView } from './views/first_view.js';
+import { cohortView } from './views/cohort_view.js';
+import { osView } from './views/os_view.js';
+import { plannedJob } from './plan_schedule.js';
+import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
+import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } from './views/post_modals.js';
+import { google } from 'googleapis';
+import fetch from 'node-fetch';
+import * as dotenv from 'dotenv';
+dotenv.config()
 
 var TeacherTACollection = new Map();
 const planned = "admin-planned-absences";
@@ -61,6 +78,8 @@ const client = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000
 });
 */
+async function checkLink(url) { return (await fetch(url)).ok }
+
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
         console.log("Monthly Reset Job is firing");
@@ -87,7 +106,7 @@ function counter(chosen, num, value) {
 }
 
 function deadlineSetter(time) {
-    deadline = DateTime.now().plus({ minutes: time }).toJSDate();
+    let deadline = DateTime.now().plus({ minutes: time }).toJSDate();
     return deadline;
 }
 
@@ -111,6 +130,7 @@ Date.prototype.timeNow = function () {
 
 
 async function findConversation(name) {
+    let channelId;
     try {
         const result = await app.client.conversations.list({
             token: process.env.SLACK_BOT_TOKEN
@@ -118,7 +138,7 @@ async function findConversation(name) {
 
         for (const channel of result.channels) {
             if (channel.name === name) {
-                //console.log("Found conversation ID " + channel.id);
+                console.log("Found conversation ID " + channel.id);
                 channelId = channel.id;
                 return await channel.id;
             }
@@ -138,7 +158,7 @@ async function publishMessage(id, text, blocks) {
             text: text,
             blocks: blocks
         });
-        messageTs = result['message']['ts'];
+        let messageTs = result['message']['ts'];
         return await result['message']['ts'];
     }
     catch (error) {
@@ -150,7 +170,7 @@ function semiInterval(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
     console.log("Time til Urgent(minutes): " + (diffObj['minutes']  - 1) );
-    timeToDeadline = (diffObj['minutes'] - 1)/2;
+    let timeToDeadline = (diffObj['minutes'] - 1)/2;
     return timeToDeadline;
 }
 
@@ -225,8 +245,8 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
 
     //console.log(body);
-    message = body['message']['text'];
-    chosen = body['user']['id'];
+    let message = body['message']['text'];
+    let chosen = body['user']['id'];
 
     if (!TeacherTACollection.has(chosen)) {
         TeacherTACollection.set(chosen, 0);
@@ -276,6 +296,8 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let channel = "";
     let msgTs = "";
     let blocks = [];
+    let message;
+    let values;
     //let facultyInput = "";
     let sessionInput = "";
     var currDateTime = new Date().today() + "T" + new Date().timeNow();
@@ -302,6 +324,17 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         faculty: view['state']['values']['faculty']['faculty_input']['selected_option']['value']
     }
     //console.log(subReqInfo);
+    console.log("Checking Link");
+
+    try {
+        await fetch(subReqInfo['link']);
+        console.log("Link works");
+    }
+    catch (e) {
+        console.error(e);
+        subReqInfo['link'] = "working link not provided";
+        console.log("Info Link is now: " + subReqInfo['link']);
+    }
 
     //Fetch user's TZ
     try {
@@ -332,7 +365,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     })
 
     //Create a DateTime in PDT and set post Locale Strings for post in planned-absence
-    pdt = dateTime.setZone("America/Los_Angeles");
+    let pdt = dateTime.setZone("America/Los_Angeles");
     logger.info("User's TZ: " + dateTime.toLocaleString(DateTime.DATETIME_FULL));
     logger.info("PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL))
     let msgDate = pdt.toLocaleString(DateTime.DATE_HUGE);
@@ -538,9 +571,9 @@ async function semiPlannedScheduler(info) {
 
             console.log("Planned Post deleted");
 
-            message = urgentPost(info);
-            values = urgentValues(info);
-            blocks = urgentModal(message, values, info['link']);
+            let message = urgentPost(info);
+            let values = urgentValues(info);
+            let blocks = urgentModal(message, values, info['link']);
             console.log("Message: " + message);
             console.log("Value: " + values);
             console.log("Block: ");
@@ -548,7 +581,7 @@ async function semiPlannedScheduler(info) {
                 console.log(blocks[i]);
             }
     
-            channel = await findConversation(urgent);
+            let channel = await findConversation(urgent);
             let msgTs = await publishMessage(channel, message, blocks);
             console.log("URGENT POSTING in " + channel + " " + msgTs);
         
@@ -582,11 +615,11 @@ async function fetchInterested(id, msgTs) {
         });
 
         // There should only be one result (stored in the zeroth index)
-        message = result.messages[0];
+        let message = result.messages[0];
 
         //console.log(message);
         console.log(message['reactions']);
-        reactArr = message['reactions'];
+        let reactArr = message['reactions'];
         if ( typeof reactArr !== 'undefined') {
             for (let i = 0; i < reactArr.length; i++) {
                 if (reactArr[i]['name'] === 'eyes') {

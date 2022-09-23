@@ -49,4 +49,4 @@ async function plannedJob(info) {
     publishMessage(info['userId'], notification(chosen, info));
 }
 
-module.exports = { plannedJob };
+export { plannedJob };
