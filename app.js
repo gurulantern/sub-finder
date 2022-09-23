@@ -712,4 +712,4 @@ async function selectSub(interested) {
   console.log("⚡️ LET'S FIND SUBSTITUTES!");
 })();
 
-
+export {app};
