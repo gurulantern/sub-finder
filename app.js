@@ -5,7 +5,7 @@ import { scheduleJob } from 'node-schedule';
 import { firstView } from './views/first_view.js';
 import { cohortView } from './views/cohort_view.js';
 import { osView } from './views/os_view.js';
-import { plannedJob } from '../../plan_schedule.js';
+import { plannedJob } from './plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } from './views/post_modals.js';
 import { google } from 'googleapis';
