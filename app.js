@@ -1,18 +1,3 @@
-/*
-const { App, LogLevel } = require('@slack/bolt');
-const { DateTime } = require('luxon');
-const { scheduleJob }  = require('node-schedule');
-const { MongoClient, CURSOR_FLAGS } = require('mongodb');
-const { firstView } = require('./views/first_view');
-const { cohortView } = require('./views/cohort_view');
-const { osView } = require('./views/os_view');
-const { plannedJob } = require('./plan_schedule');
-const { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } = require('./views/posts');
-const { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } = require('./views/post_modals');
-const { google } = require('googleapis');
-require("dotenv").config();
-*/
-
 import pkg from '@slack/bolt';
 const { App, LogLevel } = pkg;
 import { DateTime } from 'luxon';
