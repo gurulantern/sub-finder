@@ -3,9 +3,11 @@ const { App, LogLevel } = pkg;
 import { DateTime } from 'luxon';
 import { scheduleJob } from 'node-schedule';
 import { firstView } from './views/first_view.js';
+import { foundationView } from './views/foundation_view.js';
 import { cohortView } from './views/cohort_view.js';
 import { osView } from './views/os_view.js';
-import { plannedJob } from './plan_schedule.js';
+import { conceptView } from './views/concept_view.js';
+//import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } from './views/post_modals.js';
 import { google } from 'googleapis';
@@ -18,7 +20,7 @@ const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
-const spreadsheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
+const spreadsheetId= "100iB1DjQenndcZjyWQZiY3Oq4zr3whVMp-9cWCoAw-w";
 
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
@@ -205,11 +207,15 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
     //Create the current date to be used as a ref for requesting the sub date
     var today = new Date().today();
 
-    if (sesh === "Cohort") {
+    if (sesh === "Foundation") {
+        newView = foundationView(today);
+    } else if (sesh === "Cohort") {
         newView = cohortView(today);
     } else if (sesh === "Open Session") {
         newView = osView(today);
-    }
+    } else if (sesh === "Concept Class") {
+        newView = conceptView;
+    }  
 
     try {
         //Call open method for view with client
@@ -607,7 +613,7 @@ async function fetchInterested(id, msgTs) {
         let reactArr = message['reactions'];
         if ( typeof reactArr !== 'undefined') {
             for (let i = 0; i < reactArr.length; i++) {
-                if (reactArr[i]['name'] === 'eyes') {
+                if (reactArr[i]['name'] === 'ballot_box_with_check') {
                     console.log(reactArr[i]['users']);
                     users = reactArr[i]['users'];
                     return await users;
@@ -712,4 +718,4 @@ async function selectSub(interested) {
   console.log("⚡️ LET'S FIND SUBSTITUTES!");
 })();
 
-export {app};
+

@@ -11,7 +11,7 @@ function urgentPost(info){
 }
 
 function confirmation(chosenId, info){
-    return `<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* on *${info['date']} at ${info['time']} PDT* for <@${info['userId']}>. \n\nFeel free to DM <@${info['userId']}> for more details. If you can no longer make this session, please submit a new sub-finder request so others may have a chance to sub. \n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
+    return `<@${chosenId}>! You have been selected to sub *${info['session']}* playing *${info['game']}* on *${info['date']} at ${info['time']} PDT* for <@${info['userId']}>. \n\nYou can log into the AV session with this link (${info['link']}). Feel free to DM <@${info['userId']}> for more details. If you can no longer make this session, please submit a new sub-finder request so others may have a chance to sub. \n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
 function notification(chosenId, info){

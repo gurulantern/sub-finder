@@ -1,7 +1,7 @@
 function cohortView(today) {
     return {
         "type": "modal",
-        "callback_id": "request_view",
+        "callback_id": "cohort",
         "title": {
             "type": "plain_text",
             "text": "Cohort Sub Request"
@@ -18,7 +18,7 @@ function cohortView(today) {
                 "type": "section",
                 "text": {
                     "type": "plain_text",
-                    "text": "*The time window for finding substitutes is 24 hours so please be sure to post at least 24 hours before the session.",
+                    "text": "The time window for finding subs in *#admin-planned-absences* is anytime before the urgent-hour before the session is scheduled to start. If you request a sub in the urgent-hour before the session, the request will post in *#admin-urgent-issues*.",
                     "emoji": false
                 }
             },

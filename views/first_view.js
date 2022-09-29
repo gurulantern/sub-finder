@@ -19,6 +19,14 @@ const firstView = {
 					{
 						"text": {
 							"type": "plain_text",
+							"text": "Foundation",
+							"emoji": true
+						},
+						"value": "Foundation"
+					},
+					{
+						"text": {
+							"type": "plain_text",
 							"text": "Cohort",
 							"emoji": true
 						},
@@ -31,6 +39,14 @@ const firstView = {
 							"emoji": true
 						},
 						"value": "Open Session"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "Concept Class",
+							"emoji": true
+						},
+						"value": "Concept Class"
 					}
 				],
 				"action_id": "session_type"

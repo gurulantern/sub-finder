@@ -1,17 +1,17 @@
-function osView(today) {
+function foundationView(today) {
     return {
         "type": "modal",
-        "callback_id": "open_session",
+        "callback_id": "foundation",
         "title": {
             "type": "plain_text",
-            "text": "OS Sub Request"
+            "text": "Foundation Sub Request"
         },
         "blocks": [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Let's help you find a substitute!"
+                    "text": "Hello, let's help you find a substitute."
                 }
             },
             {
@@ -28,11 +28,11 @@ function osView(today) {
                 "block_id": "session",
                 "element": {
                     "type": "plain_text_input",
-                    "action_id": "session_input",
+                    "action_id": "session_input"
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Open Session Name",
+                    "text": "Cohort #",
                     "emoji": false
                 }
             },
@@ -185,6 +185,9 @@ function osView(today) {
                 }
             },
             {
+                "type": "divider"
+            },
+            {
                 "type": "input",
                 "dispatch_action": false,
                 "block_id": "faculty",
@@ -211,14 +214,6 @@ function osView(today) {
                                 "emoji": false
                             },
                             "value": "TA"
-                        },
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Qualified Teacher or TA",
-                                "emoji": false
-                            },
-                            "value": "qualified Teacher or TA"
                         }
                     ]
                 }
@@ -231,4 +226,4 @@ function osView(today) {
     }
 }
 
-export { osView };
+export { foundationView };
