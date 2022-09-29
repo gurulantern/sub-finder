@@ -9,7 +9,7 @@ import { osView } from './views/os_view.js';
 import { conceptView } from './views/concept_view.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
-import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal } from './views/post_modals.js';
+import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -20,7 +20,8 @@ const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
-const spreadsheetId= "100iB1DjQenndcZjyWQZiY3Oq4zr3whVMp-9cWCoAw-w";
+const subSheetId= process.env.SUB_SHEET;
+const facultySheetId = process.env.FACULTY_SHEET;
 
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
@@ -283,6 +284,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
     await ack();
+
     let userTZ = "America/Los_Angeles";
     let channel = "";
     let msgTs = "";
@@ -326,7 +328,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         subReqInfo['link'] = "working link not provided";
         console.log("Info Link is now: " + subReqInfo['link']);
     }
-
+    /*
     //Fetch user's TZ
     try {
         const result = await client.users.info({
@@ -339,6 +341,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     catch (error){
         console.error(error);
     }
+    */
 
     //Create a DateTime object with user's TZ
     let dateParts = subReqInfo['date'].split("-");
@@ -352,24 +355,28 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         minutes: timeParts[1]
     },
     {
-        zone: userTZ
-    })
+        zone: "America/Los_Angeles"
+    }) 
 
+    console.log(dateTime);
+    /*
     //Create a DateTime in PDT and set post Locale Strings for post in planned-absence
     let pdt = dateTime.setZone("America/Los_Angeles");
     logger.info("User's TZ: " + dateTime.toLocaleString(DateTime.DATETIME_FULL));
     logger.info("PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL))
     let msgDate = pdt.toLocaleString(DateTime.DATE_HUGE);
     let msgTime = pdt.toLocaleString(DateTime.TIME_SIMPLE);
-    
+    */
+    let msgDate = dateTime.toLocaleString(DateTime.DATE_HUGE);
+    let msgTime = dateTime.toLocaleString(DateTime.TIME_24_SIMPLE);
     subReqInfo['date'] = msgDate;
     subReqInfo['time'] = msgTime;
 
     let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
     console.log("Now:" + now);
     
-    let diffObj = pdt.diffNow('minutes').toObject();
-    subReqInfo['ISO'] = pdt.toISO();
+    let diffObj = dateTime.diffNow('minutes').toObject();
+    subReqInfo['ISO'] = dateTime.toISO();
 
     console.log("Time til session: ");
     console.log(diffObj);
@@ -394,7 +401,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //PLANNED 
     } else if (diffObj['minutes'] > 3) {
         //Await for the conversation and the message to publish
-        message = plannedPost(subReqInfo);
+        message = plannedPost(subReqInfo, false);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
@@ -412,7 +419,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     } else if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
         //Await for the conversation and the message to publish
         console.log((diffObj['minutes']/2) -1);
-        message = plannedPost(subReqInfo);
+        message = plannedPost(subReqInfo, false);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
@@ -554,13 +561,15 @@ async function semiPlannedScheduler(info) {
             publishMessage(chosen, confirmation(chosen, info));
             publishMessage(info['userId'], notification(chosen, info));
         } else if (isUrgent(info)) {
-            const result = await app.client.chat.delete({
+            const result = await app.client.chat.update({
                 token: process.env.SLACK_BOT_TOKEN,
                 channel: await findConversation(planned),
-                ts: info['msgTs']
+                ts: info['msgTs'],
+                text: plannedPost(info, true),
+                blocks: plannedMoveModal(plannedPost(info, true))
             });
 
-            console.log("Planned Post deleted");
+            console.log("Planned Post striked and moved");
 
             let message = urgentPost(info);
             let values = urgentValues(info);
@@ -595,6 +604,8 @@ async function semiPlannedScheduler(info) {
  */
 async function fetchInterested(id, msgTs) {
     //console.log("Message: " + msgTs + " & Channel: " + id);
+    let users;
+
     try {
         // Call the conversations.history method using the built-in WebClient
         const result = await app.client.conversations.history({

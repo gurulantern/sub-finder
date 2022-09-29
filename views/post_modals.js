@@ -1,3 +1,5 @@
+// Possible way to take multiple dates for subbing. 
+
 function plannedModal (msg, dateBlocks) {
     let block = [
         {
@@ -16,6 +18,13 @@ function plannedModal (msg, dateBlocks) {
     return block;
 }
 
+function dateBlocks (info) {
+    
+
+    return dateArray
+}
+
+
 function messageModal(msg) {
     let block = [
         {
@@ -28,12 +37,6 @@ function messageModal(msg) {
     ];
 
     return block;
-}
-
-function dateBlocks (info) {
-    
-
-    return dateArray
 }
 
 function urgentModal (msg, value, link) {
@@ -114,4 +117,25 @@ function resolvedModal(user, msg) {
     return resolved;
 }
 
-export { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal };
+function plannedMoveModal(msg) {
+    let move = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": msg
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": `:arrow_up:---- Request was moved to urgent-issues`
+            }
+        }
+    ]
+
+    return move;
+}
+
+export { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal, plannedMoveModal };

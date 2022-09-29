@@ -1,9 +1,9 @@
-function plannedDateItem(info){
-    return `*${info['date']}* at *${info['time']} PDT*`
-}
-
-function plannedPost(info){
-    return `<@${info['userId']}> is looking for a *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.`;
+function plannedPost(info, move){
+    if (move) {
+        return `~<@${info['userId']}> is looking for a *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.~`
+    } else {
+        return `<@${info['userId']}> is looking for a *${info['faculty']}* to sub for *${info['session']}* playing *${info['game']}* on *${info['date']}* at *${info['time']} PDT*.`;
+    }
 }
 
 function urgentPost(info){

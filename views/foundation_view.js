@@ -1,7 +1,7 @@
 function foundationView(today) {
     return {
         "type": "modal",
-        "callback_id": "foundation",
+        "callback_id": "request_view",
         "title": {
             "type": "plain_text",
             "text": "Foundation Sub Request"
@@ -18,7 +18,7 @@ function foundationView(today) {
                 "type": "section",
                 "text": {
                     "type": "plain_text",
-                    "text": "The time window for finding subs in *#admin-planned-absences* is anytime before the urgent-hour before the session is scheduled to start. If you request a sub in the urgent-hour before the session, the request will post in *#admin-urgent-issues*.",
+                    "text": "The time window for finding subs in #admin-planned-absences is anytime before the urgent-hour before the session is scheduled to start. If you request a sub in the urgent-hour before the session, the request will post in #admin-urgent-issues.",
                     "emoji": false
                 }
             },
@@ -162,7 +162,7 @@ function foundationView(today) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Date of session (Your time zone):"
+                    "text": "Date of session (PDT):"
                 }
             },
             {
@@ -181,7 +181,7 @@ function foundationView(today) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Time of session (Your time zone):"
+                    "text": "Time of session (PDT):"
                 }
             },
             {
