@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { updateSheet } from './database/sheet_functions.js';
+import { requestUpdate } from './database/sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
@@ -375,7 +375,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     })
     sheetInfo['requestor'] = userInfo['user']['profile']['email'];
 
-    subReqInfo['row'] = await updateSheet(auth, subSheetId, sheetInfo)
+    subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo)
     
     //URGENT -- Check how close the request is made to the time of session
     if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {

@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 
 
-async function updateSheet(auth, spreadsheetId, info) { 
+async function requestUpdate(auth, spreadsheetId, info) { 
     const client = await auth.getClient();
 
     const googleSheets = google.sheets({version: "v4", auth: client});
@@ -39,4 +39,4 @@ async function updateSheet(auth, spreadsheetId, info) {
     return (rows.data.values.length + 1).toString();
 }
 
-export {updateSheet};
+export {requestUpdate};
