@@ -11,6 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
+import { updateSheet } from './database/sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
@@ -20,43 +21,12 @@ const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
-const subSheetId= process.env.SUB_SHEET;
+const subSheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
 const facultySheetId = process.env.FACULTY_SHEET;
-
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
-
-async function getRows(auth, spreadsheetId) {
-    const getRows = await googleSheets.spreadsheets.values.get({
-        auth, 
-        spreadsheetId,
-        range: "Sheet1"
-    });
-
-    return (getRows.data.values.length + 1).toString();
-}
-
-async function updateSheet(auth, spreadsheetId, range, info) { 
-    const client = await auth.getClient();
-
-    const googleSheets = google.sheets({version: "v4", auth: client});
-
-    await googleSheets.spreadsheets.values.append({
-        auth,
-        spreadsheetId,
-        range: `Sheet1!${range}`,
-        valueInputOption:  "USER_ENTERED",
-        resource: {
-            values: [
-                ["9/20/2022 9:00:00", "alexander.ho@synthesis.is"]
-            ]
-        }
-    })
-
-    console.log(getRows.data);
-}
 
 /*
 //MongoDB variables
@@ -66,7 +36,6 @@ const client = new MongoClient(uri, {
     serverSelectionTimeoutMS: 5000
 });
 */
-async function checkLink(url) { return (await fetch(url)).ok }
 
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
@@ -106,16 +75,6 @@ const app = new App({
     appToken: process.env.SLACK_APP_TOKEN,
     logLevel: LogLevel.DEBUG
   });
-
-Date.prototype.today = function () { 
-    return this.getFullYear() + "-" + (this.getMonth()+1) + "-" + ((this.getDate() < 10)?"0":"") + this.getDate();
-}
-
-// For the time now
-Date.prototype.timeNow = function () {
-     return ((this.getHours() < 10)?"0":"") + this.getHours() +":"+ ((this.getMinutes() < 10)?"0":"") + this.getMinutes() +":"+ ((this.getSeconds() < 10)?"0":"") + this.getSeconds();
-}
-
 
 async function findConversation(name) {
     let channelId;
@@ -206,7 +165,8 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
     let sesh = body["actions"][0]["selected_option"]["value"]
 
     //Create the current date to be used as a ref for requesting the sub date
-    var today = new Date().today();
+    var today = DateTime.now().setZone("America/Los_Angeles").toFormat("yyyy'-'MM'-'dd");
+    console.log(today);
 
     if (sesh === "Foundation") {
         newView = foundationView(today);
@@ -285,28 +245,38 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Acknowledge submission request
     await ack();
 
-    let userTZ = "America/Los_Angeles";
-    let channel = "";
-    let msgTs = "";
+    let channel;
     let blocks = [];
     let message;
     let values;
-    //let facultyInput = "";
-    let sessionInput = "";
-    var currDateTime = new Date().today() + "T" + new Date().timeNow();
-    logger.info("Current date and time: " + currDateTime);
+    let sessionType;
+    let sessionInput;
 
     logger.info(view);
+
+    //Create a Google Sheet record update
+
+    let sheetInfo = {  }
 
     if(view['title']['text'] === 'Cohort Sub Request') {
         //facultyInput = view['state']['values']['faculty']['faculty_input']['selected_option']['value'];
         sessionInput = "Cohort " + view['state']['values']['session']['session_input']['value'];
+        sessionType = "Cohort";
+        sheetInfo['num'] = view['state']['values']['session']['session_input']['value'];
     } else if(view['title']['text'] === 'OS Sub Request') {
         //facultyInput = "either a Teacher or TA";
         sessionInput = "Open Session: " + view['state']['values']['session']['session_input']['value'];
+        sessionType = "Open Session";
+        sheetInfo['name'] = view['state']['values']['session']['session_input']['value'];
+    } else if(view['title']['text'] === 'Foundation Sub Request') {
+        sessionInput = "Foundation Cohort " + view['state']['values']['session']['session_input']['value'];
+        sessionType = "Foundation";
+        sheetInfo['num'] = view['state']['values']['session']['session_input']['value'];
     }
+ 
+    sheetInfo['type'] = sessionType;
 
-    //Fetch relevant data and store in variables
+    //Fetch relevant data and store in variables for Job payload
     let subReqInfo = {
         userId: body['user']['id'],
         session: sessionInput,
@@ -328,6 +298,10 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         subReqInfo['link'] = "working link not provided";
         console.log("Info Link is now: " + subReqInfo['link']);
     }
+
+    sheetInfo['link'] = subReqInfo['link'];
+    sheetInfo['game'] = subReqInfo['game'];
+    sheetInfo['faculty']  = subReqInfo['faculty'];
     /*
     //Fetch user's TZ
     try {
@@ -343,7 +317,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     }
     */
 
-    //Create a DateTime object with user's TZ
+    //Create a DateTime object with PT
     let dateParts = subReqInfo['date'].split("-");
     let timeParts = subReqInfo['time'].split(":");
 
@@ -367,19 +341,41 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let msgDate = pdt.toLocaleString(DateTime.DATE_HUGE);
     let msgTime = pdt.toLocaleString(DateTime.TIME_SIMPLE);
     */
+
+    //Create times for post
     let msgDate = dateTime.toLocaleString(DateTime.DATE_HUGE);
     let msgTime = dateTime.toLocaleString(DateTime.TIME_24_SIMPLE);
+
     subReqInfo['date'] = msgDate;
     subReqInfo['time'] = msgTime;
 
     let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
     console.log("Now:" + now);
+
+    //Create a Time of Request, Time of Session, and Date of Session for sheets
+    let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
+    let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
+    let dos = dateTime.toLocaleString(DateTime.DATE_SHORT);
+    let tos = dateTime.toLocaleString(DateTime.TIME_SIMPLE);
     
+    sheetInfo['reqTime'] = dor + " " + tor; 
+    sheetInfo['date'] = dos;
+    sheetInfo['time'] = tos;
+
     let diffObj = dateTime.diffNow('minutes').toObject();
     subReqInfo['ISO'] = dateTime.toISO();
 
     console.log("Time til session: ");
     console.log(diffObj);
+
+    //Grab email from Slack
+    const userInfo = await client.users.info({
+        token: process.env.SLACK_BOT_TOKEN,
+        user: subReqInfo['userId']
+    })
+    sheetInfo['requestor'] = userInfo['user']['profile']['email'];
+
+    subReqInfo['row'] = await updateSheet(auth, subSheetId, sheetInfo)
     
     //URGENT -- Check how close the request is made to the time of session
     if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
