@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate } from './database/sheet_functions.js';
+import { requestUpdate, resolutionUpdate } from './database/sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
@@ -76,6 +76,14 @@ const app = new App({
     logLevel: LogLevel.DEBUG
   });
 
+async function emailGetter(userId) {
+    const userInfo = await app.client.users.info({
+        token: process.env.SLACK_BOT_TOKEN,
+        user: userId
+    })
+    return userInfo['user']['profile']['email'];
+}
+
 async function findConversation(name) {
     let channelId;
     try {
@@ -95,7 +103,6 @@ async function findConversation(name) {
         console.error(error);
     }
 }
-
 
 async function publishMessage(id, text, blocks) {
     try {
@@ -369,13 +376,10 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     console.log(diffObj);
 
     //Grab email from Slack
-    const userInfo = await client.users.info({
-        token: process.env.SLACK_BOT_TOKEN,
-        user: subReqInfo['userId']
-    })
-    sheetInfo['requestor'] = userInfo['user']['profile']['email'];
+    sheetInfo['requestor'] = await emailGetter(subReqInfo['userId']);
 
-    subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo)
+    subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo);
+    subReqInfo['moved'] = "false";
     
     //URGENT -- Check how close the request is made to the time of session
     if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
@@ -436,7 +440,7 @@ async function plannedScheduler(info) {
         console.log("Planned Job is firing");
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
-        let interestArr = await fetchInterested(info['channel'], info['msgTs']);
+        let interestArr = await fetchInterested(info['channel'], info['msgTs'], info['faculty']);
         console.log(interestArr);
 
         if (typeof interestArr !== "undefined") {
@@ -503,7 +507,7 @@ async function semiPlannedScheduler(info) {
         console.log("SemiPlanned Job is firing");
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
-        let interestArr = await fetchInterested(info['channel'], info['msgTs']);
+        let interestArr = await fetchInterested(info['channel'], info['msgTs'], info['faculty']);
         console.log(interestArr);
         console.log(isUrgent(info));
         console.log(info);
@@ -566,7 +570,7 @@ async function semiPlannedScheduler(info) {
             });
 
             console.log("Planned Post striked and moved");
-
+            info['moved'] = "true";
             let message = urgentPost(info);
             let values = urgentValues(info);
             let blocks = urgentModal(message, values, info['link']);
@@ -598,7 +602,7 @@ async function semiPlannedScheduler(info) {
  * @param {*} msgTs The required message id/timestamp 
  * @returns An array of users that reacted to the post
  */
-async function fetchInterested(id, msgTs) {
+async function fetchInterested(id, msgTs, faculty) {
     //console.log("Message: " + msgTs + " & Channel: " + id);
     let users;
 
@@ -633,7 +637,12 @@ async function fetchInterested(id, msgTs) {
     catch (error) {
       console.error(error);
     }
-  }
+}
+
+async function verify(userArr, faculty) {
+
+    
+}
 
 /**
  * 
