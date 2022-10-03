@@ -22,11 +22,30 @@ const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
 const subSheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
-const facultySheetId = process.env.FACULTY_SHEET;
+const facultySheetId = "12lL5sna_hzX4kwClq8fk7D2LI0wbXB9GLRu99MTFqFM";
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
+
+//GoogleSheets read
+async function columnGetter(auth, spreadsheetId) {
+    const client = await auth.getClient();
+
+    const googleSheets = google.sheets({version: "v4", auth: client}); 
+
+    const users = await googleSheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!A1`,
+        valueRenderOption:  '',
+    })
+
+    console.log(users);
+}
+
+
+columnGetter(auth, facultySheetId);
 
 /*
 //MongoDB variables
@@ -443,6 +462,9 @@ async function plannedScheduler(info) {
         let interestArr = await fetchInterested(info['channel'], info['msgTs'], info['faculty']);
         console.log(interestArr);
 
+
+
+        //Replace with an array of dictionaries of arrays
         if (typeof interestArr !== "undefined") {
             let chosen;
             let message;
@@ -595,6 +617,8 @@ async function semiPlannedScheduler(info) {
         }
     })
 }
+
+
 
 /**
  * 
