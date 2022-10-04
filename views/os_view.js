@@ -1,3 +1,8 @@
+/**
+ * Returns Open Session Modal object using current date and time in PDT
+ * @param {*} today Current date/time in PDT
+ * @returns Open Session Modal
+ */
 function osView(today) {
     return {
         "type": "modal",

@@ -11,7 +11,8 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, resolutionUpdate } from './database/sheet_functions.js';
+import { requestUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
+import { queryMaker, verifyInterested } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
@@ -21,12 +22,20 @@ const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
+const facultySheetUrl = "https://docs.google.com/spreadsheets/d/12lL5sna_hzX4kwClq8fk7D2LI0wbXB9GLRu99MTFqFM/gviz/tq?tq=";
 const subSheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
 const facultySheetId = "12lL5sna_hzX4kwClq8fk7D2LI0wbXB9GLRu99MTFqFM";
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
+const emailColumn = 'C';
+const facultyColumn = 'D';
+const osColumn = 'E';
+const counterColumn = 'F';
+const activeColumn = 'G';
+
+const interestedColumns = 'A,C,D,E,F'
 
 //GoogleSheets read
 async function columnGetter(auth, spreadsheetId) {
@@ -38,14 +47,16 @@ async function columnGetter(auth, spreadsheetId) {
         auth,
         spreadsheetId,
         range: `Sheet1!A1`,
-        valueRenderOption:  '',
+        valueRenderOption:  'UNFORMATTED_VALUE',
     })
 
-    console.log(users);
+    console.log(users.data.values);
 }
 
 
 columnGetter(auth, facultySheetId);
+
+verifyInterested(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns));
 
 /*
 //MongoDB variables
@@ -95,6 +106,11 @@ const app = new App({
     logLevel: LogLevel.DEBUG
   });
 
+/**
+ * Simple function to grab Requesting User's email address for spreadsheet posting
+ * @param {*} userId Slack User ID used to retrieve email address of requester
+ * @returns Email strin
+ */
 async function emailGetter(userId) {
     const userInfo = await app.client.users.info({
         token: process.env.SLACK_BOT_TOKEN,
@@ -103,6 +119,11 @@ async function emailGetter(userId) {
     return userInfo['user']['profile']['email'];
 }
 
+/**
+ * Function that uses channel name to find the channel ID for posting
+ * @param {*} name String of channel name
+ * @returns String of channel ID
+ */
 async function findConversation(name) {
     let channelId;
     try {
@@ -123,6 +144,13 @@ async function findConversation(name) {
     }
 }
 
+/**
+ * Publishes a message or modal to a channel
+ * @param {*} id Channel ID string
+ * @param {*} text Message that posts if blocks don't post
+ * @param {*} blocks Modal block object/array
+ * @returns The message timestamp which is the identifier for updating messages
+ */
 async function publishMessage(id, text, blocks) {
     try {
         const result = await app.client.chat.postMessage({
@@ -139,6 +167,11 @@ async function publishMessage(id, text, blocks) {
     }
 }
 
+/**
+ * Function to find the time to deadline in the Semi-planned Window
+ * @param {*} info The request info object
+ * @returns Time til deadline in minutes
+ */
 function semiInterval(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
@@ -147,6 +180,11 @@ function semiInterval(info) {
     return timeToDeadline;
 }
 
+/**
+ * Function checking if the request is preurgent
+ * @param {*} info The request info object
+ * @returns True if not urgent but semi-planned/pre-urgent
+ */
 function isPreUrgent(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
@@ -156,6 +194,11 @@ function isPreUrgent(info) {
     return false;
 }
 
+/**
+ * Function checking if the request is urgent
+ * @param {*} info The request info object
+ * @returns True is request is now urgent
+ */
 function isUrgent(info) {
     let urgent = DateTime.fromISO(info['ISO']);
     let diffObj = urgent.diffNow('minutes').toObject();
@@ -165,7 +208,7 @@ function isUrgent(info) {
     return false;
 }
 
-//Command logic for the shortcut message /substitute
+//Slash command logic for summoning modal form
 app.command('/substitute', async ({ body, ack, client, logger }) => {
     //Acknowledge shortcut request
     await ack();
@@ -184,6 +227,7 @@ app.command('/substitute', async ({ body, ack, client, logger }) => {
     }
 });
 
+//Update view depending on selected session type
 app.action("session_type", async ({ body, ack, client, logger }) => {
     await ack();
 
@@ -219,6 +263,7 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
     }
 })
 
+//App action for responding to Urgent Button presses
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
 
@@ -454,6 +499,10 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     }
 });
 
+/**
+ * Function to schedule  a planned job and job logic 
+ * @param {*} info The request info
+ */
 async function plannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("Planned Job is firing");
@@ -524,6 +573,10 @@ async function plannedScheduler(info) {
     })
 }; 
 
+/**
+ * Function to schedule a semi-planned job and job logic 
+ * @param {*} info The request info
+ */
 async function semiPlannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("SemiPlanned Job is firing");
@@ -617,8 +670,6 @@ async function semiPlannedScheduler(info) {
         }
     })
 }
-
-
 
 /**
  * 

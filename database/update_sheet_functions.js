@@ -1,6 +1,12 @@
 import { google } from 'googleapis';
 
-
+/**
+ * Updates subfinder spreadsheet with new request info
+ * @param {*} auth Google auth info from credentials.json/scopes
+ * @param {*} spreadsheetId ID string from spreadsheet URL
+ * @param {*} info request info object
+ * @returns Row number for later updating
+ */
 async function requestUpdate(auth, spreadsheetId, info) { 
     const client = await auth.getClient();
 
@@ -39,6 +45,12 @@ async function requestUpdate(auth, spreadsheetId, info) {
     return (rows.data.values.length + 1).toString();
 }
 
+/**
+ * Update function to update sub-finder spreadsheet when  request is resolved
+ * @param {*} auth Google auth info from credentials.json and scope
+ * @param {*} spreadsheetId ID string from spreadsheet URL
+ * @param {*} info Request info object
+ */
 async function resolutionUpdate(auth, spreadsheetId, info) { 
     const client = await auth.getClient();
 

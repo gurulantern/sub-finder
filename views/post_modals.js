@@ -39,6 +39,13 @@ function messageModal(msg) {
     return block;
 }
 
+/**
+ * Returns an Urgent Modal message with an Assist button
+ * @param {*} msg String of text for urgent request
+ * @param {*} value value is a string of request information for resolution purposes
+ * @param {*} link AV Link or stirng describing if link works or not
+ * @returns An urgent modal using parameters
+ */
 function urgentModal (msg, value, link) {
     console.log("LINK:")
     console.log(link);
@@ -96,6 +103,12 @@ function urgentModal (msg, value, link) {
     return block;
 }
 
+/**
+ * function to return resolve modal
+ * @param {*} user Resolver/chosen sub Slack ID
+ * @param {*} msg Text for request message
+ * @returns Resolved Modal  to update  resolved modals
+ */
 function resolvedModal(user, msg) { 
     let resolved = [
         {
@@ -117,6 +130,11 @@ function resolvedModal(user, msg) {
     return resolved;
 }
 
+/**
+ * Update function to strikethrough planned move modal 
+ * @param {*} msg Strikethrough message request text
+ * @returns New modal to  update  post
+ */
 function plannedMoveModal(msg) {
     let move = [
         {

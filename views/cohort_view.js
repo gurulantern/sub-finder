@@ -1,3 +1,8 @@
+/**
+ * Returns Cohort Modal object using current date and time in PDT
+ * @param {*} today Current date/time in PDT
+ * @returns Cohort Modal
+ */
 function cohortView(today) {
     return {
         "type": "modal",

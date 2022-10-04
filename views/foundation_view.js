@@ -1,3 +1,8 @@
+/**
+ * Returns Foundation Modal object using current date and time in PDT
+ * @param {*} today Current date/time in PDT
+ * @returns Foundation Modal
+ */
 function foundationView(today) {
     return {
         "type": "modal",
