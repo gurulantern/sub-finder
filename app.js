@@ -12,7 +12,7 @@ import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgent
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
 import { requestUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
-import { queryMaker, verifyInterested } from './database/read_sheet_functions.js';
+import { queryMaker, checkEligibility } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
@@ -55,8 +55,12 @@ async function columnGetter(auth, spreadsheetId) {
 
 
 columnGetter(auth, facultySheetId);
-
-verifyInterested(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns));
+let example1 = {'faculty': 'qualified Teacher or TA'}; 
+let example2 = {'faculty': 'TA'};
+let example3 = {'faculty': 'Teacher'};
+checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example1);
+checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example2);
+checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example3);
 
 /*
 //MongoDB variables
@@ -299,8 +303,10 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 blocks: resolvedModal(body['user']['id'], body['message']['text'])
             });
 
-            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo), messageModal(urgentConfirmation(chosen, subReqInfo)));
-            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), messageModal(urgentNotification(chosen, subReqInfo)));
+            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo), 
+                messageModal(urgentConfirmation(chosen, subReqInfo)));
+            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), 
+                messageModal(urgentNotification(chosen, subReqInfo)));
         
             counter(chosen, TeacherTACollection.get(chosen), 1);
         }
@@ -508,26 +514,16 @@ async function plannedScheduler(info) {
         console.log("Planned Job is firing");
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
-        let interestArr = await fetchInterested(info['channel'], info['msgTs'], info['faculty']);
-        console.log(interestArr);
-
-
-
-        //Replace with an array of dictionaries of arrays
-        if (typeof interestArr !== "undefined") {
-            let chosen;
-            let message;
-            if (info['faculty'] === "Teacher") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            } else if (info['faculty'] === "TA") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            } else if (info['faculty'] === "qualified Teacher or TA") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            }
+        let interestedArray = await fetchInterested(info['channel'], info['msgTs']);
+        let verifiedMap = checkEligibility(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info);
         
+        console.log(interestedArray);
+        console.log(verifiedMap);
+        //Replace with an array of dictionaries of arrays
+        if (typeof interestedArray !== "undefined") {
+            let message;
+            let chosen = await selectSub(interestedArray);
+
             try {
                 // Call the conversations.history method using the built-in WebClient
                 const result = await app.client.conversations.history({
@@ -582,23 +578,15 @@ async function semiPlannedScheduler(info) {
         console.log("SemiPlanned Job is firing");
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
-        let interestArr = await fetchInterested(info['channel'], info['msgTs'], info['faculty']);
-        console.log(interestArr);
+        let interestedArray = await fetchInterested(info['channel'], info['msgTs']);
+        let verifiedMap = checkEligibility(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info);
+        console.log(interestedArray);
+        console.log(verifiedMap);
         console.log(isUrgent(info));
         console.log(info);
-        if (typeof interestArr !== "undefined") {
-            let chosen;
+        if (typeof interestedArray !== "undefined") {
             let message;
-            if (info['faculty'] === "Teacher") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            } else if (info['faculty'] === "TA") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            } else if (info['faculty'] === "qualified Teacher or TA") {
-                console.log(interestArr);
-                chosen = await selectSub(interestArr);
-            }
+            let chosen = await selectSub(interestedArray);
         
             try {
                 // Call the conversations.history method using the built-in WebClient
@@ -677,7 +665,7 @@ async function semiPlannedScheduler(info) {
  * @param {*} msgTs The required message id/timestamp 
  * @returns An array of users that reacted to the post
  */
-async function fetchInterested(id, msgTs, faculty) {
+async function fetchInterested(id, msgTs) {
     //console.log("Message: " + msgTs + " & Channel: " + id);
     let users;
 
@@ -778,13 +766,13 @@ function facultyGetter(choices) {
     return chosen;
 };
 
-
+/*
 /**
  * 
  * @param {*} interested Array of interested faculty 
  * @param {*} faculty The map of required faculty
  * @returns chosen party for assignment
- */
+ 
 async function selectSub(interested) {
     let choices = new Map();
     for (let i = 0; i < interested.length; i ++) {
@@ -801,6 +789,7 @@ async function selectSub(interested) {
 
     return await facultyGetter(choices);
 }
+*/
 
 (async () => {
   // Start your app
