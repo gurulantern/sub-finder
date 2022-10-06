@@ -76,4 +76,4 @@ async function checkEligibility(query, info) {
 
 
 
-export {checkEligibility, queryMaker};
+export {checkEligibility, queryMaker, mapMaker};

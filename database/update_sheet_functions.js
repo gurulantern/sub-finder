@@ -42,10 +42,11 @@ async function requestUpdate(auth, spreadsheetId, info) {
     });
 
     console.log("Posted to" + (rows.data.values.length + 1).toString());
-    return (rows.data.values.length + 1).toString();
+    return (rows.data.values.length).toString();
 }
 
 async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMap) {
+    console.log("Updating sheet with eligibles");
     const client = await auth.getClient();
 
     const googleSheets = google.sheets({version: "v4", auth: client});
@@ -71,6 +72,7 @@ async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMa
             ]
         }
     })
+    console.log("Finished updating eligibles");
 }
 
 /**
