@@ -45,6 +45,34 @@ async function requestUpdate(auth, spreadsheetId, info) {
     return (rows.data.values.length + 1).toString();
 }
 
+async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMap) {
+    const client = await auth.getClient();
+
+    const googleSheets = google.sheets({version: "v4", auth: client});
+    
+    let interestedAndEligible = '';
+    let count = verifiedMap.size;
+
+    verifiedMap.forEach(function(value, key) {
+        interestedAndEligible = interestedAndEligible + value[0] + '; ';
+    })
+
+    await googleSheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!K${info['row']}:Q${info['row']}`,
+        valueInputOption:  "USER_ENTERED",
+        resource: {
+            values: [
+                [
+                    interestedAndEligible,
+                    count                
+                ]
+            ]
+        }
+    })
+}
+
 /**
  * Update function to update sub-finder spreadsheet when  request is resolved
  * @param {*} auth Google auth info from credentials.json and scope
@@ -77,4 +105,4 @@ async function resolutionUpdate(auth, spreadsheetId, info) {
     })
 }
 
-export {requestUpdate, resolutionUpdate};
+export {requestUpdate, interestedAndEligibleUpdate, resolutionUpdate};

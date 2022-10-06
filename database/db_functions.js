@@ -1,3 +1,10 @@
+//MongoDB variables
+const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
+const client = new MongoClient(uri, {
+    connectTimeoutMS: 5000,
+    serverSelectionTimeoutMS: 5000
+});
+
 async function listDatabases(client) {
     databasesList = await client.db().admin().listDatabases();
 

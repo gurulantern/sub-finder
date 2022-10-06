@@ -29,7 +29,7 @@ function queryMaker(spreadSheetUrl, userIds, column) {
 
 /**
  * Creates a Map using Slack User ID as key and array as value (email, faculty, os qualified, counter)
- * @param {*} rawArray The raw array that comes from the rows of queried users
+ * @param {*} rawArray The raw array that comes from the rows of queried users in Google Sheet
  * @returns  The map of user IDs and user info attached to an ID 
  */
 function mapMaker(rawArray) {
@@ -52,11 +52,13 @@ function mapMaker(rawArray) {
 /**
  * Uses a query to fetch the users and corresponding data. Then returns a map that   
  * @param {*} query A query url built in the app using interested users
+ * @param {*} info Substitute request info to check the faculty needed
+ * @returns A map with eligible subs
  */
-async function checkEligibility(query, info) {
+async function checkEligibility(query, info) {    
     fetch(query)
     .then(res => res.text())
-    .then(rep =>{
+    .then(rep => {
         const data = JSON.parse(rep.substring(47).slice(0,-2));
         let interestedMap = mapMaker(data['table']['rows']);
         interestedMap.forEach(function(value, key) {
@@ -68,9 +70,10 @@ async function checkEligibility(query, info) {
                 if (!value[2]) interestedMap.delete(key); 
             }
         })
-        console.log(interestedMap);
-        return interestedMap;
-    })    
+        return interestedMap
+    }); 
 }
+
+
 
 export {checkEligibility, queryMaker};

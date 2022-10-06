@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
+import { requestUpdate, interestedAndEligibleUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
 import { queryMaker, checkEligibility } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -29,48 +29,33 @@ const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
-const emailColumn = 'C';
-const facultyColumn = 'D';
-const osColumn = 'E';
 const counterColumn = 'F';
 const activeColumn = 'G';
-
 const interestedColumns = 'A,C,D,E,F'
 
-//GoogleSheets read
-async function columnGetter(auth, spreadsheetId) {
-    const client = await auth.getClient();
-
-    const googleSheets = google.sheets({version: "v4", auth: client}); 
-
-    const users = await googleSheets.spreadsheets.values.get({
-        auth,
-        spreadsheetId,
-        range: `Sheet1!A1`,
-        valueRenderOption:  'UNFORMATTED_VALUE',
-    })
-
-    console.log(users.data.values);
-}
-
-
-columnGetter(auth, facultySheetId);
 let example1 = {'faculty': 'qualified Teacher or TA'}; 
 let example2 = {'faculty': 'TA'};
 let example3 = {'faculty': 'Teacher'};
-checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example1);
-checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example2);
-checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example3);
+const map1 = checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example1);
+const map2 = await checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example2);
+const map3 = await checkEligibility(queryMaker(facultySheetUrl, ['U040QDM7W8Y','U03UME6R21L','U03V8F34F6H'], interestedColumns), example3);
+
+const updateSheet1 = async () => {
+    const m = await map1;
+    console.log(m);
+}
+
+updateSheet1();
 
 /*
-//MongoDB variables
-const uri = `mongodb+srv://sub-finder:${process.env.MONGO_USER_PW}@cluster0.ejudd.mongodb.net/?retryWrites=true&w=majority`;
-const client = new MongoClient(uri, {
-    connectTimeoutMS: 5000,
-    serverSelectionTimeoutMS: 5000
-});
-*/
+let chose1 = await randomSelector(map1)
+let chose2 = await randomSelector(map2)
+let chose3 = await randomSelector(map3)
 
+console.log(chose1)
+console.log(chose2)
+console.log(chose3)
+*/
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
         console.log("Monthly Reset Job is firing");
@@ -505,6 +490,106 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     }
 });
 
+const jobLogic = async (planned) => {
+    const verified = await verifiedMap;
+    
+    if (typeof verified !== 'undefined' ) {
+        interestedAndEligibleUpdate(auth, subSheetId, info, verified);
+
+        let message;
+        let chosen = await randomSelector(verified);
+
+        try {
+            // Call the conversations.history method using the built-in WebClient
+            const result = await app.client.conversations.history({
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: info['channel'],
+                latest: info['msgTs'],
+                inclusive: true,
+                limit: 1
+            });
+    
+            // There should only be one result (stored in the zeroth index)
+            message = result.messages[0];
+        }
+        catch (error) {
+            console.error(error);
+        }
+    
+        try {
+            //console.log("Message: " + message.text);
+            //console.log("channel: " + info['channel']);
+            //Call open method for view with client
+            const result = await app.client.chat.update({
+                token: process.env.SLACK_BOT_TOKEN,
+                channel: info['channel'],
+                ts: info['msgTs'],
+                text: message.text,
+                blocks: resolvedModal(chosen, message.text)
+            });
+        }
+        catch (error) {
+            console.error(error);
+        }
+    
+        publishMessage(chosen, confirmation(chosen, info));
+        publishMessage(info['userId'], notification(chosen, info)); 
+    } else if (planned) {
+        if (isPreUrgent(info)) {
+            semiPlannedLogic(info);
+        } else {
+            plannedLogic(info);
+        }
+    } else if (!planned) {
+        if (isUrgent(info)) {
+            urgentLogic(info);
+        } else {
+            semiPlannedLogic(info);
+        }
+    }
+}
+
+const plannedLogic = (info) => {
+    info['deadline'] = deadlineSetter(1);
+    plannedScheduler(info);
+}
+
+const semiPlannedLogic = (info) => {
+    info['deadline'] = deadlineSetter(semiInterval(info));
+    semiPlannedScheduler(info);
+}
+
+const urgentLogic = async (info) => {
+    const result = await app.client.chat.update({
+        token: process.env.SLACK_BOT_TOKEN,
+        channel: await findConversation(planned),
+        ts: info['msgTs'],
+        text: plannedPost(info, true),
+        blocks: plannedMoveModal(plannedPost(info, true))
+    });
+
+    console.log("Planned Post striked and moved");
+    info['moved'] = "true";
+    let message = urgentPost(info);
+    let values = urgentValues(info);
+    let blocks = urgentModal(message, values, info['link']);
+    console.log("Message: " + message);
+    console.log("Value: " + values);
+    console.log("Block: ");
+    for (let i = 0; i < blocks.length; i++) {
+        console.log(blocks[i]);
+    }
+
+    let channel = await findConversation(urgent);
+    let msgTs = await publishMessage(channel, message, blocks);
+    console.log("URGENT POSTING in " + channel + " " + msgTs);
+
+    info['msgTs'] = msgTs;
+    info['channel'] = channel;
+
+    console.log(info);
+}
+
 /**
  * Function to schedule  a planned job and job logic 
  * @param {*} info The request info
@@ -514,15 +599,18 @@ async function plannedScheduler(info) {
         console.log("Planned Job is firing");
         let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
         console.log("Now:" + now);
-        let interestedArray = await fetchInterested(info['channel'], info['msgTs']);
-        let verifiedMap = checkEligibility(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info);
-        
-        console.log(interestedArray);
-        console.log(verifiedMap);
+        const interestedArray = await fetchInterested(info['channel'], info['msgTs']);
+        const verifiedMap = checkEligibility(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info);
+        const updateSheet = async () => {
+            const vMap = await verifiedMap;
+            interestedAndEligibleUpdate(auth, subSheetId, info, vMap)  
+        }
+        //interestedAndEligibleUpdate(auth, subSheetId, info, verifiedMap);
+
         //Replace with an array of dictionaries of arrays
-        if (typeof interestedArray !== "undefined") {
+        if (typeof vMap !== "undefined") {
             let message;
-            let chosen = await selectSub(interestedArray);
+            let chosen = await randomSelector(verifiedMap);
 
             try {
                 // Call the conversations.history method using the built-in WebClient
@@ -580,13 +668,16 @@ async function semiPlannedScheduler(info) {
         console.log("Now:" + now);
         let interestedArray = await fetchInterested(info['channel'], info['msgTs']);
         let verifiedMap = checkEligibility(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info);
+
+        interestedAndEligibleUpdate(auth, subSheetId, info, verifiedMap);
+
         console.log(interestedArray);
         console.log(verifiedMap);
         console.log(isUrgent(info));
         console.log(info);
-        if (typeof interestedArray !== "undefined") {
+        if (typeof verifiedMap !== "undefined") {
             let message;
-            let chosen = await selectSub(interestedArray);
+            let chosen = await selectSub(verifiedMap);
         
             try {
                 // Call the conversations.history method using the built-in WebClient
@@ -702,29 +793,25 @@ async function fetchInterested(id, msgTs) {
     }
 }
 
-async function verify(userArr, faculty) {
-
-    
-}
-
 /**
  * 
  * @param {*} faculty The Collection of faculty to iterate
  * @param {*} currentLow The current lowest amount of the subs assigned to person
  * @returns the current lowes amount of subs assigned
  */
-function findLowSub(currentLow) {
+function findLowSub(verifiedMap) {
     var i = 0;
+    var currentLow = 0;
 
     //Iterate through and if anything is lower than current low set that as current low
-    TeacherTACollection.forEach(function (value, key) {
+    verifiedMap.forEach(function (value, key) {
         if (i === 0) {
-            currentLow = value;
+            currentLow = value[3];
             i++;
         }
         else {
             if (value < currentLow) {
-                currentLow = value;
+                currentLow = value[3];
             }
         }
     });
@@ -739,15 +826,14 @@ function findLowSub(currentLow) {
  * @param {*} faculty The selected required faculty for updates to counters
  * @returns The randomly chosen interested party
  */
-function facultyGetter(choices) {
+async function randomSelector(verifiedMap) {
     //initialize empty selections and temp current low
     let selections = [];
-    let currentLow = 0;
 
     //Call findLowSub to get the true current low
-    let low = findLowSub(choices, currentLow);
+    let low = findLowSub(verifiedMap);
     choices.forEach(function (value, key) {
-        if (value === low) {
+        if (value[3] === low) {
             selections.push(key);
         }
     });
@@ -787,7 +873,7 @@ async function selectSub(interested) {
     console.log("Choices: " + choices);
     console.log("TeacherTACollection: " + TeacherTACollection);
 
-    return await facultyGetter(choices);
+    return await randomSelector(choices);
 }
 */
 
