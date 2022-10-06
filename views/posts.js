@@ -19,7 +19,7 @@ function notification(chosenId, info){
 }
 
 function urgentValues(info){
-    return `${info['userId']},${info['session']},${info['game']},${info['time']},${info['link']},${info['faculty']},${info['moved']}`;
+    return `${info['userId']},${info['session']},${info['game']},${info['time']},${info['link']},${info['faculty']},${info['moved']},${info['row']}`;
 }
 
 function urgentConfirmation(chosenId, info){

@@ -67,7 +67,7 @@ async function resolutionUpdate(auth, spreadsheetId, info, verifiedMap, sub, isU
         urgentResolver = 'n/a';
         urgentToR = 'n/a';
     } else {
-        urgentResolver = sub
+        urgentResolver = sub;
         urgentToR = tor;
         interestedAndEligible = 'n/a';
         count = 0;

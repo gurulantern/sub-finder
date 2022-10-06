@@ -234,7 +234,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
     let message = body['message']['text'];
     let sub = body['user']['id'];
-    let subEmail = emailGetter(sub);    
+    let subEmail = await emailGetter(sub);    
 
     let infoArr = body['actions'][0]['value'].split(",");
     let subReqInfo = {
@@ -244,7 +244,8 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
         time: infoArr[3],
         link: infoArr[4],
         faculty: infoArr[5],
-        moved: infoArr[6]
+        moved: infoArr[6],
+        row: infoArr[7]
     }    
 
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
