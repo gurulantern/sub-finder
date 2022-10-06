@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, interestedAndEligibleUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
+import { requestUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -232,14 +232,9 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
 //App action for responding to Urgent Button presses
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
-
-    //console.log(body);
     let message = body['message']['text'];
-    let chosen = body['user']['id'];
-
-    if (!TeacherTACollection.has(chosen)) {
-        TeacherTACollection.set(chosen, 0);
-    }
+    let sub = body['user']['id'];
+    let subEmail = emailGetter(sub);    
 
     let infoArr = body['actions'][0]['value'].split(",");
     let subReqInfo = {
@@ -248,11 +243,14 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
         game: infoArr[2],
         time: infoArr[3],
         link: infoArr[4],
-        faculty: infoArr[5]
+        faculty: infoArr[5],
+        moved: infoArr[6]
     }    
-    //console.log(body['actions'][0]['value']);
-    //console.log(infoArr);
-    //console.log(subReqInfo);
+
+    let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
+    let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
+
+    resolutionUpdate(auth, subSheetId, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
 
     //if (chosen !== subReqInfo['userId']) {
         try {
@@ -341,20 +339,6 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     sheetInfo['link'] = subReqInfo['link'];
     sheetInfo['game'] = subReqInfo['game'];
     sheetInfo['faculty']  = subReqInfo['faculty'];
-    /*
-    //Fetch user's TZ
-    try {
-        const result = await client.users.info({
-            user: subReqInfo['userId']
-        })
-
-        userTZ = result['user']['tz'];
-        //console.log("User TZ : "+ userTZ);
-    }
-    catch (error){
-        console.error(error);
-    }
-    */
 
     //Create a DateTime object with PT
     let dateParts = subReqInfo['date'].split("-");
@@ -372,13 +356,6 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     }) 
 
     console.log(dateTime);
-    /*
-    //Create a DateTime in PDT and set post Locale Strings for post in planned-absence
-    logger.info("User's TZ: " + dateTime.toLocaleString(DateTime.DATETIME_FULL));
-    logger.info("PDT: " + pdt.toLocaleString(DateTime.DATETIME_FULL))
-    let msgDate = pdt.toLocaleString(DateTime.DATE_HUGE);
-    let msgTime = pdt.toLocaleString(DateTime.TIME_SIMPLE);
-    */
 
     //Create times for post
     let msgDate = dateTime.toLocaleString(DateTime.DATE_HUGE);
@@ -390,7 +367,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
     console.log("Now:" + now);
 
-    //Create a Time of Request, Time of Session, and Date of Session for sheets
+    //Create a Time of Request (tor), Time of Session (tos), Date of Request (dor),and Date of Session (dos) for sheets
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
     let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
     let dos = dateTime.toLocaleString(DateTime.DATE_SHORT);
@@ -516,36 +493,38 @@ const urgentLogic = async (info) => {
 async function plannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("Planned Job is firing");
-        let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
-        console.log("Now:" + now);
         const interestedArray = await fetchInterested(info['channel'], info['msgTs']);
-        const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
-            .then(res => res.text())
-            .then(rep => {
-                const data = JSON.parse(rep.substring(47).slice(0,-2));
-                let interestedMap = mapMaker(data['table']['rows']);
-                interestedMap.forEach(function(value, key) {
-                    if (example1['faculty'] === 'Teacher') {
-                        if (value[1] !== 'Teacher') interestedMap.delete(key);
-                    } else if (example1['faculty'] === 'TA') {
-                        if (value[1] !== 'TA') interestedMap.delete(key)
-                    } else if (example1['faculty'] === 'qualified Teacher or TA') {
-                        if (!value[2]) interestedMap.delete(key); 
-                    }
-                })
-                return interestedMap
-        }); 
+        if (typeof interestedArray !== 'undefined') {
+            const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
+                .then(res => res.text())
+                .then(rep => {
+                    const data = JSON.parse(rep.substring(47).slice(0,-2));
+                    let interestedMap = mapMaker(data['table']['rows']);
+                    interestedMap.forEach(function(value, key) {
+                        if (info['faculty'] === 'Teacher') {
+                            if (value[1] !== 'Teacher') interestedMap.delete(key);
+                        } else if (info['faculty'] === 'TA') {
+                            if (value[1] !== 'TA') interestedMap.delete(key)
+                        } else if (info['faculty'] === 'qualified Teacher or TA') {
+                            if (!value[2]) interestedMap.delete(key); 
+                        }
+                    })
+                    return interestedMap
+            }); 
 
-        const jobLogic = async (info) => {
-            const verified = await verifiedMap;
-        
-            if (typeof verified !== 'undefined' ) {
-                console.log("Verified is defined");
-                interestedAndEligibleUpdate(auth, subSheetId, info, verified);
-        
+            const jobLogic = async (info) => {
+                const verified = await verifiedMap;
+            
+                console.log("Verified is defined");        
                 let message;
                 let chosen = await randomSelector(verified);
-        
+
+                //Date of Resolution and Time of Resolution
+                let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
+                let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
+
+                resolutionUpdate(auth, subSheetId, info, verified, chosen, false, `${dor} ${tor}`);
+
                 try {
                     // Call the conversations.history method using the built-in WebClient
                     const result = await app.client.conversations.history({
@@ -581,16 +560,16 @@ async function plannedScheduler(info) {
             
                 publishMessage(chosen, confirmation(chosen, info));
                 publishMessage(info['userId'], notification(chosen, info)); 
-            } else if (isPreUrgent(info)) {
-                semiPlannedLogic(info);
-            } else {
-                plannedLogic(info);
             }
-        }
 
-        jobLogic(info);
+            jobLogic(info);
+        } else if (isPreUrgent(info)) {
+            semiPlannedLogic(info);
+        } else {
+            plannedLogic(info);
+        }
     })
-}; 
+} 
 
 /**
  * Function to schedule a semi-planned job and job logic 
@@ -599,79 +578,81 @@ async function plannedScheduler(info) {
 async function semiPlannedScheduler(info) {
     scheduleJob(info['msgTs'], info['deadline'], async () => {
         console.log("SemiPlanned Job is firing");
-        let now = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATETIME_FULL);
-        console.log("Now:" + now);
-        let interestedArray = await fetchInterested(info['channel'], info['msgTs']);
-        const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
-        .then(res => res.text())
-        .then(rep => {
-            const data = JSON.parse(rep.substring(47).slice(0,-2));
-            let interestedMap = mapMaker(data['table']['rows']);
-            interestedMap.forEach(function(value, key) {
-                if (example1['faculty'] === 'Teacher') {
-                    if (value[1] !== 'Teacher') interestedMap.delete(key);
-                } else if (example1['faculty'] === 'TA') {
-                    if (value[1] !== 'TA') interestedMap.delete(key)
-                } else if (example1['faculty'] === 'qualified Teacher or TA') {
-                    if (!value[2]) interestedMap.delete(key); 
-                }
-            })
-            return interestedMap
-    }); 
+        const interestedArray = await fetchInterested(info['channel'], info['msgTs']);
+        if (typeof interestedArray !== 'undefined') {
+            const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
+                .then(res => res.text())
+                .then(rep => {
+                    const data = JSON.parse(rep.substring(47).slice(0,-2));
+                    let interestedMap = mapMaker(data['table']['rows']);
+                    interestedMap.forEach(function(value, key) {
+                        if (info['faculty'] === 'Teacher') {
+                            if (value[1] !== 'Teacher') interestedMap.delete(key);
+                        } else if (info['faculty'] === 'TA') {
+                            if (value[1] !== 'TA') interestedMap.delete(key)
+                        } else if (info['faculty'] === 'qualified Teacher or TA') {
+                            if (!value[2]) interestedMap.delete(key); 
+                        }
+                    })
+                    return interestedMap
+            }); 
 
-    const jobLogic = async (info) => {
-        const verified = await verifiedMap;
-    
-        if (typeof verified !== 'undefined' ) {
-            console.log("Verified is defined");
-            interestedAndEligibleUpdate(auth, subSheetId, info, verified);
-    
-            let message;
-            let chosen = await randomSelector(verified);
-    
-            try {
-                // Call the conversations.history method using the built-in WebClient
-                const result = await app.client.conversations.history({
-                    token: process.env.SLACK_BOT_TOKEN,
-                    channel: info['channel'],
-                    latest: info['msgTs'],
-                    inclusive: true,
-                    limit: 1
-                });
+            const jobLogic = async (info) => {
+                const verified = await verifiedMap;
+            
+                console.log("Verified is defined");
         
-                // There should only be one result (stored in the zeroth index)
-                message = result.messages[0];
-            }
-            catch (error) {
-                console.error(error);
-            }
-        
-            try {
-                //console.log("Message: " + message.text);
-                //console.log("channel: " + info['channel']);
-                //Call open method for view with client
-                const result = await app.client.chat.update({
-                    token: process.env.SLACK_BOT_TOKEN,
-                    channel: info['channel'],
-                    ts: info['msgTs'],
-                    text: message.text,
-                    blocks: resolvedModal(chosen, message.text)
-                });
-            }
-            catch (error) {
-                console.error(error);
-            }
-        
-            publishMessage(chosen, confirmation(chosen, info));
-            publishMessage(info['userId'], notification(chosen, info)); 
+                let message;
+                let chosen = await randomSelector(verified);
+
+                //Date of Resolution and Time of Resolution
+                let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
+                let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
+
+                resolutionUpdate(auth, subSheetId, info, verified, chosen, false, `${dor} ${tor}`);
+
+                try {
+                    // Call the conversations.history method using the built-in WebClient
+                    const result = await app.client.conversations.history({
+                        token: process.env.SLACK_BOT_TOKEN,
+                        channel: info['channel'],
+                        latest: info['msgTs'],
+                        inclusive: true,
+                        limit: 1
+                    });
+            
+                    // There should only be one result (stored in the zeroth index)
+                    message = result.messages[0];
+                }
+                catch (error) {
+                    console.error(error);
+                }
+            
+                try {
+                    //console.log("Message: " + message.text);
+                    //console.log("channel: " + info['channel']);
+                    //Call open method for view with client
+                    const result = await app.client.chat.update({
+                        token: process.env.SLACK_BOT_TOKEN,
+                        channel: info['channel'],
+                        ts: info['msgTs'],
+                        text: message.text,
+                        blocks: resolvedModal(chosen, message.text)
+                    });
+                }
+                catch (error) {
+                    console.error(error);
+                }
+            
+                publishMessage(chosen, confirmation(chosen, info));
+                publishMessage(info['userId'], notification(chosen, info)); 
+            } 
+            jobLogic(info);
         } else if (isUrgent(info)) {
             urgentLogic(info);
         } else {
             semiPlannedLogic(info);
         }
-    }
-
-    jobLogic(info);
     })
 }
 
@@ -782,5 +763,3 @@ async function randomSelector(verifiedMap) {
 
   console.log("⚡️ LET'S FIND SUBSTITUTES!");
 })();
-
-

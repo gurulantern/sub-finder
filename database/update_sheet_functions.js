@@ -45,18 +45,35 @@ async function requestUpdate(auth, spreadsheetId, info) {
     return (rows.data.values.length).toString();
 }
 
-async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMap) {
+async function resolutionUpdate(auth, spreadsheetId, info, verifiedMap, sub, isUrgent, tor) {
     console.log("Updating sheet with eligibles");
     const client = await auth.getClient();
+    let plannedResolver;
+    let urgentResolver;
+    let plannedToR;
+    let urgentToR;
+    let count;
+    let interestedAndEligible = '';
 
     const googleSheets = google.sheets({version: "v4", auth: client});
     
-    let interestedAndEligible = '';
-    let count = verifiedMap.size;
-
-    verifiedMap.forEach(function(value, key) {
-        interestedAndEligible = interestedAndEligible + value[0] + '; ';
-    })
+    if (verifiedMap.size >= 1 && !isUrgent) {
+        count = verifiedMap.size;
+        verifiedMap.forEach(function(value, key) {
+            interestedAndEligible = interestedAndEligible + value[0] + '; ';
+        })
+        plannedResolver = verifiedMap.get(sub)[0];
+        plannedToR = tor;
+        urgentResolver = 'n/a';
+        urgentToR = 'n/a';
+    } else {
+        urgentResolver = sub
+        urgentToR = tor;
+        interestedAndEligible = 'n/a';
+        count = 0;
+        plannedResolver = 'n/a';
+        plannedToR = 'n/a';
+    }
 
     await googleSheets.spreadsheets.values.update({
         auth,
@@ -67,7 +84,12 @@ async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMa
             values: [
                 [
                     interestedAndEligible,
-                    count                
+                    count,           
+                    plannedResolver,
+                    plannedToR,
+                    info['moved'],
+                    urgentResolver,
+                    urgentToR     
                 ]
             ]
         }
@@ -75,36 +97,5 @@ async function interestedAndEligibleUpdate(auth, spreadsheetId, info, verifiedMa
     console.log("Finished updating eligibles");
 }
 
-/**
- * Update function to update sub-finder spreadsheet when  request is resolved
- * @param {*} auth Google auth info from credentials.json and scope
- * @param {*} spreadsheetId ID string from spreadsheet URL
- * @param {*} info Request info object
- */
-async function resolutionUpdate(auth, spreadsheetId, info) { 
-    const client = await auth.getClient();
 
-    const googleSheets = google.sheets({version: "v4", auth: client});
-    
-    await googleSheets.spreadsheets.values.append({
-        auth,
-        spreadsheetId,
-        range: `Sheet1!K1:Q1`,
-        valueInputOption:  "USER_ENTERED",
-        resource: {
-            values: [
-                [
-                    info['interested'], 
-                    info['count'], 
-                    info['resolver'], 
-                    info['resTime'],
-                    info['repost'], 
-                    info['urgeResolver'],
-                    info['urgeTime']
-                ]
-            ]
-        }
-    })
-}
-
-export {requestUpdate, interestedAndEligibleUpdate, resolutionUpdate};
+export {requestUpdate, resolutionUpdate};
