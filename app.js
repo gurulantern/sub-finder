@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, resolutionUpdate, counterUpdater, resetCounters } from './database/update_sheet_functions.js';
+import { requestUpdate, resolutionUpdate, counterUpdater, activeUpdater, resetCounters } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -30,19 +30,19 @@ const auth = new google.auth.GoogleAuth({
 });
 const interestedColumns = 'A,C,D,E,F'
 
-resetCounters(auth, facultySheetId);
-
+//Monthly Reset Logic
 const rule = new RecurrenceRule();
 rule.hour = 24;
 
 async function monthlyReset(rule) {
     scheduleJob(rule, async () => {
         console.log("Monthly Reset Job is firing");
-
+        resetCounters(auth, facultySheetId);
     })
 }
 
-//monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
+monthlyReset(rule);
+
 /**
  * Function to set new deadlines to check for substitutes
  * @param {*} time Interval of time to set next deadline
@@ -377,7 +377,9 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //Grab email from Slack
     sheetInfo['requestor'] = await emailGetter(subReqInfo['userId']);
 
-    subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo);
+    if (diffObj['minutes'] >= -30) {
+        subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo);
+    }
     console.log("Row of this request:");
     console.log(subReqInfo['row']);
     subReqInfo['moved'] = "false";
@@ -693,7 +695,7 @@ async function fetchInterested(id, msgTs) {
 }
 
 /**
- * Finds the current lowest counter in the eligible subs interested
+ * Finds the current lowest counter in the eligible subs interested and updates Active status
  * @param {*} verifiedMap Returned map of eligibles in Promise chain
  * @returns the current lowes amount of subs assigned
  */
@@ -701,6 +703,7 @@ function findLowSub(verifiedMap) {
     var i = 0;
     var currentLow = 0;
 
+    verifiedMap.forEach((value, key) => activeUpdater(key, facultySheetUrl, auth, facultySheetId))
     //Iterate through and if anything is lower than current low set that as current low
     verifiedMap.forEach(function (value, key) {
         if (i === 0) {

@@ -3,6 +3,66 @@ import { queryMaker } from './read_sheet_functions.js';
 import fetch from 'node-fetch';
 
 /**
+ * Updater function for subs that are actively looking for opportunities
+ * @param {*} user Slack ID of user
+ * @param {*} facultySheetUrl Googlesheet URL
+ * @param {*} auth auth info in app
+ * @param {*} spreadsheetId sheet ID of needed Google Sheet
+ */
+async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
+    const rowNumber = fetch(facultySheetUrl)
+    .then(res => res.text())
+    .then(rep => {
+        const data = JSON.parse(rep.substring(47).slice(0,-2));
+        const rows = data['table']['rows'];
+        for(let i = 0; i < rows.length; i++) {
+            if (rows[i]['c'][0]['v'] === user) {
+                //Add 2 to result to offset the 0 indexing of arrays and the header row
+                return i + 2;
+            }
+        }
+    })
+
+    const active = fetch(queryMaker(facultySheetUrl, [user], 'G'))
+        .then(res => res.text())
+        .then(rep => {
+            const data = JSON.parse(rep.substring(47).slice(0,-2));
+            console.log(data)
+            console.log(data['table']['rows'][0]['c'][0]['v']);
+            return data['table']['rows'][0]['c'][0]['v'];
+        })
+
+    const sheetUpdate = async (auth, spreadsheetId) => {
+        const client = await auth.getClient();
+        const googleSheets = google.sheets({version: "v4", auth: client});
+
+        const row = await rowNumber;
+        try {
+            if (await active !== 'TRUE') {
+                await googleSheets.spreadsheets.values.update({
+                    auth,
+                    spreadsheetId,
+                    range: `Sheet1!G${row}`,
+                    valueInputOption:  "USER_ENTERED",
+                    resource: {
+                        values: [
+                            [ 'TRUE' ]
+                        ]
+                    }
+                })
+            } else {
+                console.log("User is already Active");
+            }
+        }
+        catch(e) {
+            console.error(e);
+        }
+    } 
+
+    sheetUpdate(auth, spreadsheetId);
+}
+
+/**
  * Counter updater that fetches the row of the User and updates that Column cell
  * @param {*} newValue New Counter Value for substitute
  * @param {*} user Slack User ID
@@ -93,7 +153,7 @@ async function requestUpdate(auth, spreadsheetId, info) {
         range: "Sheet1"
     });
 
-    console.log("Posted to" + (rows.data.values.length + 1).toString());
+    console.log("Posted to row " + (rows.data.values.length).toString());
     return (rows.data.values.length).toString();
 }
 
@@ -148,6 +208,11 @@ async function resolutionUpdate(auth, spreadsheetId, info, verifiedMap, sub, isU
     })
 }
 
+/**
+ * Function to reset the counters for all faculty on the faculty sheet
+ * @param {*} auth Google auth info in the App
+ * @param {*} spreadsheetId SpreadsheetID of the sheet with faculty info
+ */
 async function resetCounters(auth, spreadsheetId) {
     const client = await auth.getClient();
     const googleSheets = google.sheets({version: "v4", auth: client});
@@ -214,4 +279,4 @@ async function resetCounters(auth, spreadsheetId) {
 }
 
 
-export {requestUpdate, resolutionUpdate, counterUpdater, resetCounters};
+export {requestUpdate, resolutionUpdate, counterUpdater, activeUpdater, resetCounters};
