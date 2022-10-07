@@ -29,9 +29,43 @@ const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
-const counterColumn = 'F';
-const activeColumn = 'G';
 const interestedColumns = 'A,C,D,E,F'
+
+async function counterUpdater(newValue, user) {
+    const rowNumber = fetch(facultySheetUrl + encodeURIComponent('select *'))
+    .then(res => res.text())
+    .then(rep => {
+        const data = JSON.parse(rep.substring(47).slice(0,-2));
+        const rows = data['table']['rows'];
+        console.log(data);
+        for(let i = 0; i < rows.length; i++) {
+            if (rows[i]['c'][0]['v'] === user) {
+                return i + 2;
+            }
+        }
+    })
+
+    const sheetUpdate = async (auth, spreadsheetId, newValue) => {
+        const client = await auth.getClient();
+        const googleSheets = google.sheets({version: "v4", auth: client});
+
+        const row = await rowNumber;
+
+        await googleSheets.spreadsheets.values.update({
+            auth,
+            spreadsheetId,
+            range: `Sheet1!F${row}`,
+            valueInputOption:  "USER_ENTERED",
+            resource: {
+                values: [
+                    [ newValue ]
+                ]
+            }
+        })
+    } 
+
+    sheetUpdate(auth, facultySheetId, newValue);
+}
 
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
@@ -50,7 +84,7 @@ async function monthlyReset(deadline) {
 
 monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
 
-function counter(chosen, num, value) {
+function counter(row, num, value) {
     TeacherTACollection.set(chosen, num + value);
     console.log(chosen + " is at " + TeacherTACollection.get(chosen));
     console.log("---------------------------");
@@ -268,8 +302,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 messageModal(urgentConfirmation(chosen, subReqInfo)));
             publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), 
                 messageModal(urgentNotification(chosen, subReqInfo)));
-        
-            counter(chosen, TeacherTACollection.get(chosen), 1);
+            //counterUpdater(auth, facultySheetId, subReqInfo['row'])
         }
         catch (error) {
             logger.error(error);
@@ -500,6 +533,8 @@ async function plannedScheduler(info) {
                 .then(res => res.text())
                 .then(rep => {
                     const data = JSON.parse(rep.substring(47).slice(0,-2));
+
+                    console.log(data);
                     let interestedMap = mapMaker(data['table']['rows']);
                     interestedMap.forEach(function(value, key) {
                         if (info['faculty'] === 'Teacher') {
@@ -750,7 +785,7 @@ async function randomSelector(verifiedMap) {
     let num = verifiedMap.get(chosen)[3];
 
     //Update counter in selected Faculty map and Whole faculty map\
-    counter(chosen, num, 1);
+    //counter(chosen, num, 1);
 
     //empty selections
     selections.splice(0);
