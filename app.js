@@ -11,7 +11,7 @@ import { conceptView } from './views/concept_view.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, resolutionUpdate } from './database/update_sheet_functions.js';
+import { requestUpdate, resolutionUpdate, counterUpdater } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
@@ -31,42 +31,6 @@ const auth = new google.auth.GoogleAuth({
 });
 const interestedColumns = 'A,C,D,E,F'
 
-async function counterUpdater(newValue, user) {
-    const rowNumber = fetch(facultySheetUrl + encodeURIComponent('select *'))
-    .then(res => res.text())
-    .then(rep => {
-        const data = JSON.parse(rep.substring(47).slice(0,-2));
-        const rows = data['table']['rows'];
-        console.log(data);
-        for(let i = 0; i < rows.length; i++) {
-            if (rows[i]['c'][0]['v'] === user) {
-                return i + 2;
-            }
-        }
-    })
-
-    const sheetUpdate = async (auth, spreadsheetId, newValue) => {
-        const client = await auth.getClient();
-        const googleSheets = google.sheets({version: "v4", auth: client});
-
-        const row = await rowNumber;
-
-        await googleSheets.spreadsheets.values.update({
-            auth,
-            spreadsheetId,
-            range: `Sheet1!F${row}`,
-            valueInputOption:  "USER_ENTERED",
-            resource: {
-                values: [
-                    [ newValue ]
-                ]
-            }
-        })
-    } 
-
-    sheetUpdate(auth, facultySheetId, newValue);
-}
-
 async function monthlyReset(deadline) {
     scheduleJob(deadline, async () => {
         console.log("Monthly Reset Job is firing");
@@ -83,15 +47,11 @@ async function monthlyReset(deadline) {
 }
 
 monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
-
-function counter(row, num, value) {
-    TeacherTACollection.set(chosen, num + value);
-    console.log(chosen + " is at " + TeacherTACollection.get(chosen));
-    console.log("---------------------------");
-    console.log("Updated faculty collection");
-    TeacherTACollection.forEach(function(count, userId) { console.log("{ " + userId + " : " + count + " }") });
-}
-
+/**
+ * Function to set new deadlines to check for substitutes
+ * @param {*} time Interval of time to set next deadline
+ * @returns JSDate of new deadline
+ */
 function deadlineSetter(time) {
     let deadline = DateTime.now().plus({ minutes: time }).toJSDate();
     return deadline;
@@ -109,7 +69,7 @@ const app = new App({
 /**
  * Simple function to grab Requesting User's email address for spreadsheet posting
  * @param {*} userId Slack User ID used to retrieve email address of requester
- * @returns Email strin
+ * @returns Email string
  */
 async function emailGetter(userId) {
     const userInfo = await app.client.users.info({
@@ -287,6 +247,8 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
 
     resolutionUpdate(auth, subSheetId, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
 
+    counterUpdater(sub, facultySheetUrl, auth, facultySheetId);
+
     //if (chosen !== subReqInfo['userId']) {
         try {
             //Call open method for view with client
@@ -302,7 +264,6 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 messageModal(urgentConfirmation(chosen, subReqInfo)));
             publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), 
                 messageModal(urgentNotification(chosen, subReqInfo)));
-            //counterUpdater(auth, facultySheetId, subReqInfo['row'])
         }
         catch (error) {
             logger.error(error);
@@ -693,7 +654,7 @@ async function semiPlannedScheduler(info) {
 }
 
 /**
- * 
+ * Fetches the array of Slack User Ids to verify and select a sub from
  * @param {*} id The channel id to search for the required message
  * @param {*} msgTs The required message id/timestamp 
  * @returns An array of users that reacted to the post
@@ -736,9 +697,8 @@ async function fetchInterested(id, msgTs) {
 }
 
 /**
- * 
- * @param {*} faculty The Collection of faculty to iterate
- * @param {*} currentLow The current lowest amount of the subs assigned to person
+ * Finds the current lowest counter in the eligible subs interested
+ * @param {*} verifiedMap Returned map of eligibles in Promise chain
  * @returns the current lowes amount of subs assigned
  */
 function findLowSub(verifiedMap) {
@@ -763,8 +723,8 @@ function findLowSub(verifiedMap) {
 };
 
 /**
- * 
- * @param {*} verifiedMap The map of interested and eligible faculty
+ * Random selection function that uses findLowSub to select the sub
+ * @param {*} verifiedMap Returned map of eligibles in Promise chain
  * @returns The randomly chosen interested party
  */
 async function randomSelector(verifiedMap) {
@@ -782,13 +742,10 @@ async function randomSelector(verifiedMap) {
     // Set random number based on length of selections and fetch
     let random = Math.floor(Math.random() * selections.length);
     var chosen = selections[random];
-    let num = verifiedMap.get(chosen)[3];
 
     //Update counter in selected Faculty map and Whole faculty map\
-    //counter(chosen, num, 1);
+    counterUpdater(chosen, facultySheetUrl, auth, facultySheetId);
 
-    //empty selections
-    selections.splice(0);
     console.log(chosen + " was picked.");
     return chosen;
 };
