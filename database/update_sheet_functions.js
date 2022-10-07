@@ -87,6 +87,9 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
             const data = JSON.parse(rep.substring(47).slice(0,-2));
             console.log(data)
             console.log(data['table']['rows'][0]['c'][0]['v']);
+            if (data['table']['rows'][0]['c'][0]['v'] < 0) {
+                return 0;
+            }
             return data['table']['rows'][0]['c'][0]['v'];
         })
 
