@@ -148,5 +148,70 @@ async function resolutionUpdate(auth, spreadsheetId, info, verifiedMap, sub, isU
     })
 }
 
+async function resetCounters(auth, spreadsheetId) {
+    const client = await auth.getClient();
+    const googleSheets = google.sheets({version: "v4", auth: client});
 
-export {requestUpdate, resolutionUpdate, counterUpdater};
+    let updatedCounters = [];
+    let updatedActives = [];
+
+    let rawCounters = await googleSheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!F2:F`
+    })
+
+    let rawActives = await googleSheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!G2:G`
+    })
+
+    console.log(rawCounters['data']['values']);
+    console.log(rawActives['data']['values']);
+
+    let counters = rawCounters['data']['values'];
+    let actives = rawActives['data']['values'];
+
+    for (let i = 0; i < counters.length; i++ ) {
+        let currentCounter = parseInt(counters[i][0])
+        console.log("Current Counter: " + currentCounter);
+        if (currentCounter <= 0) {
+            if (actives[i][0] == 'TRUE') {
+                currentCounter --;
+            } else {
+                currentCounter = 0;
+            }
+        } else {
+            currentCounter = 0;
+        }
+        updatedCounters.push([currentCounter]);
+        updatedActives.push(['FALSE']);
+    }
+
+    console.log(updatedActives);
+    console.log(updatedCounters);
+
+    await googleSheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!F2:F`,
+        valueInputOption:  "USER_ENTERED",
+        resource: {
+            values: updatedCounters 
+        }
+    })
+
+    await googleSheets.spreadsheets.values.update({
+        auth,
+        spreadsheetId,
+        range: `Sheet1!G2:G`,
+        valueInputOption:  "USER_ENTERED",
+        resource: {
+            values: updatedActives
+        }
+    })
+}
+
+
+export {requestUpdate, resolutionUpdate, counterUpdater, resetCounters};

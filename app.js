@@ -1,7 +1,7 @@
 import pkg from '@slack/bolt';
 const { App, LogLevel } = pkg;
 import { DateTime } from 'luxon';
-import { scheduleJob } from 'node-schedule';
+import { scheduleJob, RecurrenceRule } from 'node-schedule';
 import { firstView } from './views/first_view.js';
 import { foundationView } from './views/foundation_view.js';
 import { cohortView } from './views/cohort_view.js';
@@ -9,15 +9,14 @@ import { osView } from './views/os_view.js';
 import { conceptView } from './views/concept_view.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
-import { plannedModal, dateBlocks, messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
+import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
 import { google } from 'googleapis';
-import { requestUpdate, resolutionUpdate, counterUpdater } from './database/update_sheet_functions.js';
+import { requestUpdate, resolutionUpdate, counterUpdater, resetCounters } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
 import fetch from 'node-fetch';
 import * as dotenv from 'dotenv';
 dotenv.config()
 
-var TeacherTACollection = new Map();
 const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
@@ -31,22 +30,19 @@ const auth = new google.auth.GoogleAuth({
 });
 const interestedColumns = 'A,C,D,E,F'
 
-async function monthlyReset(deadline) {
-    scheduleJob(deadline, async () => {
-        console.log("Monthly Reset Job is firing");
-        TeacherTACollection.forEach(function(count, userId) {
-            if(count <= 0 ) {
-                count --;
-            } else if (count > 0) {
-                count = 0;
-            }
+resetCounters(auth, facultySheetId);
 
-            console.log("{" + userId + " : " + count + " }");
-        })
+const rule = new RecurrenceRule();
+rule.hour = 24;
+
+async function monthlyReset(rule) {
+    scheduleJob(rule, async () => {
+        console.log("Monthly Reset Job is firing");
+
     })
 }
 
-monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
+//monthlyReset(DateTime.now().plus({ minutes: 6 }).toJSDate());
 /**
  * Function to set new deadlines to check for substitutes
  * @param {*} time Interval of time to set next deadline

@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 
 /**
  * Builds a query url using the spreadsheet URL, the interested users, and the desired columns from spreadsheet 
