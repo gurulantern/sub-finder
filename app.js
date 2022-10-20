@@ -7,6 +7,7 @@ import { foundationView } from './views/foundation_view.js';
 import { cohortView } from './views/cohort_view.js';
 import { osView } from './views/os_view.js';
 import { conceptView } from './views/concept_view.js';
+import { invalidTime } from './views/invalid_time.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
@@ -283,7 +284,6 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     logger.info(view);
 
     //Create a Google Sheet record update
-
     let sheetInfo = {  }
 
     if(view['title']['text'] === 'Cohort Sub Request') {
@@ -379,7 +379,21 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
     if (diffObj['minutes'] >= -30) {
         subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo);
+    } else {
+        try {
+            //Call open method for view with client
+            const result = await client.views.open({
+                trigger_id: body.trigger_id,
+                //View payload of the request modal
+                view: invalidTime
+            });
+            logger.info(result);
+        }
+        catch (error) {
+            logger.error(error);
+        }
     }
+
     console.log("Row of this request:");
     console.log(subReqInfo['row']);
     subReqInfo['moved'] = "false";
