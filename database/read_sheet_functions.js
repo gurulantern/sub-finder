@@ -27,7 +27,7 @@ function queryMaker(spreadSheetUrl, userIds, column) {
 }
 
 /**
- * Creates a Map using Slack User ID as key and array as value (email, faculty, os qualified, counter)
+ * Creates a Map using Slack User ID as key and array as value (email, faculty, os qualified, foundation qualified, counter)
  * @param {*} rawArray The raw array that comes from the rows of queried users in Google Sheet
  * @returns  The map of user IDs and user info attached to an ID 
  */

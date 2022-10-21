@@ -153,6 +153,49 @@ function foundationView(today) {
             },
             {
                 "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select an age range",
+                        "emoji": true
+                    },
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "6-8",
+                                "emoji": false
+                            },
+                            "value": "6-8"
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "8-11",
+                                "emoji": false
+                            },
+                            "value": "8-11"
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": "11-14",
+                                "emoji": false
+                            },
+                            "value": "11-14"
+                        }
+                    ],
+                    "action_id": "static_select-action"
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "What is the age range?",
+                    "emoji": false
+                }
+            },
+            {
+                "type": "input",
                 "dispatch_action": false,
                 "block_id": "date",
                 "element": {
@@ -193,16 +236,13 @@ function foundationView(today) {
                 "type": "divider"
             },
             {
-                "type": "input",
-                "dispatch_action": false,
-                "block_id": "faculty",
-                "label": {
-                    "type": "plain_text",
-                    "text": "Are you in need of a Teacher or a TA?"
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Are you in need of a teacher or a TA?*"
                 },
-                "element": {
+                "accessory": {
                     "type": "radio_buttons",
-                    "action_id": "faculty_input",
                     "options": [
                         {
                             "text": {
@@ -220,9 +260,10 @@ function foundationView(today) {
                             },
                             "value": "TA"
                         }
-                    ]
+                    ],
+                    "action_id": "faculty-action"
                 }
-            }
+            },
         ],
         "submit": {
             "type": "plain_text",

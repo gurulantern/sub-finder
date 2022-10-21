@@ -8,6 +8,7 @@ import { cohortView } from './views/cohort_view.js';
 import { osView } from './views/os_view.js';
 import { conceptView } from './views/concept_view.js';
 import { invalidTime } from './views/invalid_time.js';
+import { teacherSelect, taSelect } from './views/user_select.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
@@ -29,7 +30,7 @@ const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
 });
-const interestedColumns = 'A,C,D,E,F'
+const interestedColumns = 'A,C,D,E,F,G'
 
 //Monthly Reset Logic
 const rule = new RecurrenceRule();
@@ -513,9 +514,13 @@ async function plannedScheduler(info) {
                         if (info['faculty'] === 'Teacher') {
                             if (value[1] !== 'Teacher') interestedMap.delete(key);
                         } else if (info['faculty'] === 'TA') {
-                            if (value[1] !== 'TA') interestedMap.delete(key)
+                            if (value[1] !== 'TA') interestedMap.delete(key);
                         } else if (info['faculty'] === 'qualified Teacher or TA') {
                             if (!value[2]) interestedMap.delete(key); 
+                        } 
+
+                        if (info['type'] == "Foundation") {
+                            if (!value[3]) interestedMap.delete(key);
                         }
                     })
                     return interestedMap
@@ -721,12 +726,12 @@ function findLowSub(verifiedMap) {
     //Iterate through and if anything is lower than current low set that as current low
     verifiedMap.forEach(function (value, key) {
         if (i === 0) {
-            currentLow = value[3];
+            currentLow = value[4];
             i++;
         }
         else {
             if (value < currentLow) {
-                currentLow = value[3];
+                currentLow = value[4];
             }
         }
     });
@@ -747,7 +752,7 @@ async function randomSelector(verifiedMap) {
     //Call findLowSub to get the true current low
     let low = findLowSub(verifiedMap);
     verifiedMap.forEach(function (value, key) {
-        if (value[3] === low) {
+        if (value[4] === low) {
             selections.push(key);
         }
     });
