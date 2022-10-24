@@ -8,7 +8,9 @@ import { teacherSelect, taSelect } from './user_select.js';
 function osView(today, teacher, qualified) {
     let facultyChoice;
     if (qualified) {
-        facultyChoice = 
+        facultyChoice = 		{
+			"type": "divider"
+		};
     } else if (teacher) {
         facultyChoice = taSelect;
     } else if (teacher) {

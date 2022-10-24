@@ -235,6 +235,11 @@ app.action("faculty-action", async ({ body, ack, client, logger }) => {
     } else if (sesh === 'Foundation') {
         newView = faculty === 'teacher' ? foundationView(today, true) : foundationView(today, false);
     } else if (sesh === 'Open Session') {
+        if (faculty === "qualified teacher or TA") {
+            newView = osView(today, false, true);
+        } else {
+            newView = faculty === 'teacher' ? osView(today, true, false) : osView(today, false, false);
+        }
 
     }
 
