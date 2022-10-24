@@ -166,6 +166,7 @@ function osView(today, teacher, qualified) {
             },
             {
                 "type": "input",
+                "block_id": "age",
                 "element": {
                     "type": "static_select",
                     "placeholder": {
@@ -199,7 +200,7 @@ function osView(today, teacher, qualified) {
                             "value": "11-14"
                         }
                     ],
-                    "action_id": "static_select-action"
+                    "action_id": "age_input"
                 },
                 "label": {
                     "type": "plain_text",

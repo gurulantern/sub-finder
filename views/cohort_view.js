@@ -163,8 +163,10 @@ function cohortView(today, teacher) {
             },
             {
                 "type": "input",
+                "block_id": "age",
                 "element": {
                     "type": "static_select",
+                    "action_id": "age_input",
                     "placeholder": {
                         "type": "plain_text",
                         "text": "Select an age range",
@@ -196,7 +198,7 @@ function cohortView(today, teacher) {
                             "value": "11-14"
                         }
                     ],
-                    "action_id": "static_select-action"
+                    "action_id": "age_input"
                 },
                 "label": {
                     "type": "plain_text",
@@ -220,7 +222,7 @@ function cohortView(today, teacher) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Date of session (PDT):"
+                    "text": "Date of session (PT):"
                 }
             },
             {
@@ -239,11 +241,8 @@ function cohortView(today, teacher) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Time of session (PDT):"
+                    "text": "Time of session (PT):"
                 }
-            },
-            {
-                "type": "divider"
             },
             facultyChoice
         ],

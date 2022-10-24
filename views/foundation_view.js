@@ -1,6 +1,6 @@
 import { teacherSelect, taSelect } from './user_select.js';
 /**
- * Returns Foundation Modal object using current date and time in PDT
+ * Returns Foundation Modal object using current date and time in PT
  * @param {*} today Current date/time in PT
  * @param {*} teacher Bool whether they are asking for teacher or TA. If true returns taSelect and false returns teacherSelect
  * @returns Foundation Modal
@@ -162,6 +162,7 @@ function foundationView(today, teacher) {
             },
             {
                 "type": "input",
+                "block_id": "age",
                 "element": {
                     "type": "static_select",
                     "placeholder": {
@@ -195,7 +196,7 @@ function foundationView(today, teacher) {
                             "value": "11-14"
                         }
                     ],
-                    "action_id": "static_select-action"
+                    "action_id": "age_input"
                 },
                 "label": {
                     "type": "plain_text",
@@ -219,7 +220,7 @@ function foundationView(today, teacher) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Date of session (PDT):"
+                    "text": "Date of session (PT):"
                 }
             },
             {
@@ -238,7 +239,7 @@ function foundationView(today, teacher) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Time of session (PDT):"
+                    "text": "Time of session (PT):"
                 }
             },
             facultyChoice

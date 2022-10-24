@@ -319,9 +319,11 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let values;
     let sessionType;
     let sessionInput;
+    let qualified = false;
 
-    logger.info(view);
-
+    logger.info(view.blocks)
+    logger.info(view.state.values);
+    logger.info(view.blocks.length);
     //Create a Google Sheet record update
     let sheetInfo = {  }
 
@@ -351,9 +353,21 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         game: view['state']['values']['game']['game_input']['selected_option']['value'],
         date: view['state']['values']['date']['date_input']['selected_date'],
         time: view['state']['values']['time']['time_input']['selected_time'],
-        faculty: view['state']['values']['faculty']['faculty_input']['selected_option']['value']
+        age: view['state']['values']['age']['age_input']['selected_option']['value'],
     }
-    //console.log(subReqInfo);
+
+    if (view.blocks[8].type == 'divider') {
+        subReqInfo.faculty = "qualified teacher or TA";
+        qualified = true;
+    } else if(view.blocks[8].label.text === "Who is the TA for the session?") {
+        subReqInfo.faculty = "teacher";
+        subReqInfo.partner = view['state']['values']['user']['users_select-action']['selected_user'];
+    } else if (view.blocks[8].label.text === "Who is the teacher for the session?") {
+        subReqInfo.faculty = "TA";
+        subReqInfo.partner = view['state']['values']['user']['users_select-action']['selected_user'];
+    }
+
+    console.log(subReqInfo);
     console.log("Checking Link");
 
     try {
@@ -439,7 +453,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     
     //URGENT -- Check how close the request is made to the time of session
     if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
-        message = urgentPost(subReqInfo);
+        message = urgentPost(subReqInfo,  qualified);
         values = urgentValues(subReqInfo);
         blocks = urgentModal(message, values, subReqInfo['link']);
         console.log("Message: " + message);
@@ -457,7 +471,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     //PLANNED 
     } else if (diffObj['minutes'] > 3) {
         //Await for the conversation and the message to publish
-        message = plannedPost(subReqInfo, false);
+        message = plannedPost(subReqInfo, false, qualified);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
@@ -475,7 +489,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     } else if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
         //Await for the conversation and the message to publish
         console.log((diffObj['minutes']/2) -1);
-        message = plannedPost(subReqInfo, false);
+        message = plannedPost(subReqInfo, false, qualified);
 
         channel = await findConversation(planned);
         let msgTs = await publishMessage(channel, message, blocks);
@@ -506,13 +520,13 @@ const urgentLogic = async (info) => {
         token: process.env.SLACK_BOT_TOKEN,
         channel: await findConversation(planned),
         ts: info['msgTs'],
-        text: plannedPost(info, true),
-        blocks: plannedMoveModal(plannedPost(info, true))
+        text: plannedPost(info, true, info['faculty'] === 'qualified teacher or TA'? true:false),
+        blocks: plannedMoveModal(plannedPost(info, true, info['faculty'] === 'qualified teacher or TA'? true:false))
     });
 
     console.log("Planned Post striked and moved");
     info['moved'] = "true";
-    let message = urgentPost(info);
+    let message = urgentPost(info, info['faculty'] === 'qualified teacher or TA'? true:false);
     let values = urgentValues(info);
     let blocks = urgentModal(message, values, info['link']);
     console.log("Message: " + message);

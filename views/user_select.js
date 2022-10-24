@@ -1,7 +1,9 @@
 const teacherSelect = {
     "type": "input",
+    "block_id": "user",
     "element": {
         "type": "users_select",
+        "action_id": "user_input",
         "placeholder": {
             "type": "plain_text",
             "text": "Select Teacher",
@@ -18,8 +20,10 @@ const teacherSelect = {
 
 const taSelect = {
     "type": "input",
+    "block_id": "user",
     "element": {
         "type": "users_select",
+        "action_id": "user_input",
         "placeholder": {
             "type": "plain_text",
             "text": "Select TA",
