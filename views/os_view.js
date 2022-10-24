@@ -1,9 +1,20 @@
+import { teacherSelect, taSelect } from './user_select.js';
+
 /**
- * Returns Open Session Modal object using current date and time in PDT
- * @param {*} today Current date/time in PDT
+ * Returns Open Session Modal object using current date and time in PT
+ * @param {*} today Current date/time in PT
  * @returns Open Session Modal
  */
-function osView(today) {
+function osView(today, teacher, qualified) {
+    let facultyChoice;
+    if (qualified) {
+        facultyChoice = 
+    } else if (teacher) {
+        facultyChoice = taSelect;
+    } else if (teacher) {
+        facultyChoice = teacherSelect;
+    }
+
     return {
         "type": "modal",
         "callback_id": "request_view",
@@ -210,7 +221,7 @@ function osView(today) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Date of session (PDT):"
+                    "text": "Date of session (PT):"
                 }
             },
             {
@@ -229,62 +240,10 @@ function osView(today) {
                 },
                 "label": {
                     "type": "plain_text",
-                    "text": "Time of session (PDT):"
+                    "text": "Time of session (PT):"
                 }
             },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Who is the Teacher or TA for the session? (If N/A leave blank)*"
-                },
-                "accessory": {
-                    "type": "users_select",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": "Select a user",
-                        "emoji": true
-                    },
-                    "action_id": "users_select-action"
-                }
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Are you in need of a teacher or a TA?*"
-                },
-                "accessory": {
-                    "type": "radio_buttons",
-                    "options": [
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Teacher",
-                                "emoji": false
-                            },
-                            "value": "Teacher"
-                        },
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "TA",
-                                "emoji": false
-                            },
-                            "value": "TA"
-                        },
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Qualified Teacher or TA",
-                                "emoji": false
-                            },
-                            "value": "qualified Teacher or TA"
-                        }
-                    ],
-                    "action_id": "faculty-action"
-                }
-            },
+            facultyChoice
         ],
         "submit": {
             "type": "plain_text",

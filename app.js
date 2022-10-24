@@ -9,6 +9,7 @@ import { osView } from './views/os_view.js';
 import { conceptView } from './views/concept_view.js';
 import { invalidTime } from './views/invalid_time.js';
 import { teacherSelect, taSelect } from './views/user_select.js';
+import { osFaculty, cohortFaculty, foundationFaculty } from './views/faculty_form.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
 import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
@@ -190,21 +191,52 @@ app.action("session_type", async ({ body, ack, client, logger }) => {
     await ack();
 
     let newView = {}
-    let sesh = body["actions"][0]["selected_option"]["value"]
-
-    //Create the current date to be used as a ref for requesting the sub date
-    var today = DateTime.now().setZone("America/Los_Angeles").toFormat("yyyy'-'MM'-'dd");
-    console.log(today);
+    let sesh = body.actions[0].selected_option.value;
 
     if (sesh === "Foundation") {
-        newView = foundationView(today);
+        newView = foundationFaculty;
     } else if (sesh === "Cohort") {
-        newView = cohortView(today);
+        newView = cohortFaculty;
     } else if (sesh === "Open Session") {
-        newView = osView(today);
+        newView = osFaculty;
     } else if (sesh === "Concept Class") {
         newView = conceptView;
     }  
+
+    try {
+        //Call open method for view with client
+        const result = await client.views.update({
+            view_id: body.view.id,
+            hash: body.view.hash,
+            //View payload of the request modal
+            view: newView
+        });
+        logger.info(result);
+    }
+    catch (error) {
+        logger.error(error);
+    }
+})
+
+app.action("faculty-action", async ({ body, ack, client, logger }) => {
+    await ack();
+    let newView;
+    let faculty = body.actions[0].selected_option.value;
+    let sesh = body.view.title.text;
+
+    //Create the current date to be used as a ref for requesting the sub date
+    var today = DateTime.now().setZone("America/Los_Angeles").toFormat("yyyy'-'MM'-'dd");
+
+    console.log(faculty);
+    console.log(sesh);
+
+    if (sesh === 'Cohort') {
+        newView = faculty === 'teacher' ? cohortView(today, true) : cohortView(today, false);
+    } else if (sesh === 'Foundation') {
+        newView = faculty === 'teacher' ? foundationView(today, true) : foundationView(today, false);
+    } else if (sesh === 'Open Session') {
+
+    }
 
     try {
         //Call open method for view with client
@@ -269,6 +301,7 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     //}
 })
 
+app.view
 
 //Listener for submission of request
 app.view("request_view", async ({ ack, body, view, client, logger }) => {

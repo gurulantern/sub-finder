@@ -1,9 +1,19 @@
+import { teacherSelect, taSelect } from './user_select.js';
+
 /**
- * Returns Cohort Modal object using current date and time in PDT
- * @param {*} today Current date/time in PDT
+ * Returns Cohort Modal object using current date and time in PT
+ * @param {*} today Current date/time in PT
+ * @param {*} teacher Bool whether they are asking for teacher or TA. If true returns taSelect and false returns teacherSelect
  * @returns Cohort Modal
  */
-function cohortView(today) {
+function cohortView(today, teacher) {
+    let facultyChoice;
+    if (teacher) {
+        facultyChoice = taSelect;
+    } else {
+        facultyChoice = teacherSelect;
+    }
+
     return {
         "type": "modal",
         "callback_id": "request_view",
@@ -235,35 +245,7 @@ function cohortView(today) {
             {
                 "type": "divider"
             },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Are you in need of a teacher or a TA?*"
-                },
-                "accessory": {
-                    "type": "radio_buttons",
-                    "options": [
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Teacher",
-                                "emoji": false
-                            },
-                            "value": "Teacher"
-                        },
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": "TA",
-                                "emoji": false
-                            },
-                            "value": "TA"
-                        }
-                    ],
-                    "action_id": "faculty-action"
-                }
-            },
+            facultyChoice
         ],
         "submit": {
             "type": "plain_text",

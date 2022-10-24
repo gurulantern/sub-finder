@@ -16,7 +16,6 @@ const teacherSelect = {
     }
 }
 
-
 const taSelect = {
     "type": "input",
     "element": {
