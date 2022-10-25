@@ -10,6 +10,7 @@ import fetch from 'node-fetch';
  * @param {*} spreadsheetId sheet ID of needed Google Sheet
  */
 async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
+    //Grabs the row number where the User id matches the row.
     const rowNumber = fetch(facultySheetUrl)
     .then(res => res.text())
     .then(rep => {
@@ -23,7 +24,8 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
         }
     })
 
-    const active = fetch(queryMaker(facultySheetUrl, [user], 'G'))
+    //Grabs column H using sheetUrl and the user
+    const active = fetch(queryMaker(facultySheetUrl, [user], 'H'))
         .then(res => res.text())
         .then(rep => {
             const data = JSON.parse(rep.substring(47).slice(0,-2));
@@ -32,6 +34,7 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
             return data['table']['rows'][0]['c'][0]['v'];
         })
 
+    //Updates the sheet cell using column H and the row number    
     const sheetUpdate = async (auth, spreadsheetId) => {
         const client = await auth.getClient();
         const googleSheets = google.sheets({version: "v4", auth: client});
@@ -42,7 +45,7 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
                 await googleSheets.spreadsheets.values.update({
                     auth,
                     spreadsheetId,
-                    range: `Sheet1!G${row}`,
+                    range: `Sheet1!H${row}`,
                     valueInputOption:  "USER_ENTERED",
                     resource: {
                         values: [
@@ -59,6 +62,7 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
         }
     } 
 
+    //Updates the sheet
     sheetUpdate(auth, spreadsheetId);
 }
 
@@ -67,7 +71,8 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
  * @param {*} newValue New Counter Value for substitute
  * @param {*} user Slack User ID
  */
- async function counterUpdater(user, facultySheetUrl, auth, spreadsheetId) {
+ async function counterUpdater(user, facultySheetUrl, auth, spreadsheetId, updateInt) {
+    //Grabs the row number where the User id matches the row.
     const rowNumber = fetch(facultySheetUrl)
     .then(res => res.text())
     .then(rep => {
@@ -81,7 +86,8 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
         }
     })
 
-    const counter = fetch(queryMaker(facultySheetUrl, [user], 'F'))
+    //Grabs column G using sheetUrl and the user
+    const counter = fetch(queryMaker(facultySheetUrl, [user], 'G'))
         .then(res => res.text())
         .then(rep => {
             const data = JSON.parse(rep.substring(47).slice(0,-2));
@@ -102,11 +108,11 @@ async function activeUpdater(user, facultySheetUrl, auth, spreadsheetId) {
         await googleSheets.spreadsheets.values.update({
             auth,
             spreadsheetId,
-            range: `Sheet1!F${row}`,
+            range: `Sheet1!G${row}`,
             valueInputOption:  "USER_ENTERED",
             resource: {
                 values: [
-                    [ await counter + 1 ]
+                    [ await counter + updateInt ]
                 ]
             }
         })
@@ -212,7 +218,7 @@ async function resolutionUpdate(auth, spreadsheetId, info, verifiedMap, sub, isU
 }
 
 /**
- * Function to reset the counters for all faculty on the faculty sheet
+ * Function to reset the counters for all faculty on the faculty sheet. Currently checks column G for Counters and column H for Active status.
  * @param {*} auth Google auth info in the App
  * @param {*} spreadsheetId SpreadsheetID of the sheet with faculty info
  */
@@ -226,13 +232,13 @@ async function resetCounters(auth, spreadsheetId) {
     let rawCounters = await googleSheets.spreadsheets.values.get({
         auth,
         spreadsheetId,
-        range: `Sheet1!F2:F`
+        range: `Sheet1!G2:G`
     })
 
     let rawActives = await googleSheets.spreadsheets.values.get({
         auth,
         spreadsheetId,
-        range: `Sheet1!G2:G`
+        range: `Sheet1!H2:H`
     })
 
     console.log(rawCounters['data']['values']);
@@ -263,7 +269,7 @@ async function resetCounters(auth, spreadsheetId) {
     await googleSheets.spreadsheets.values.update({
         auth,
         spreadsheetId,
-        range: `Sheet1!F2:F`,
+        range: `Sheet1!G2:G`,
         valueInputOption:  "USER_ENTERED",
         resource: {
             values: updatedCounters 
@@ -273,7 +279,7 @@ async function resetCounters(auth, spreadsheetId) {
     await googleSheets.spreadsheets.values.update({
         auth,
         spreadsheetId,
-        range: `Sheet1!G2:G`,
+        range: `Sheet1!H2:H`,
         valueInputOption:  "USER_ENTERED",
         resource: {
             values: updatedActives

@@ -2,17 +2,16 @@ import pkg from '@slack/bolt';
 const { App, LogLevel } = pkg;
 import { DateTime } from 'luxon';
 import { scheduleJob, RecurrenceRule } from 'node-schedule';
-import { firstView } from './views/first_view.js';
-import { foundationView } from './views/foundation_view.js';
-import { cohortView } from './views/cohort_view.js';
-import { osView } from './views/os_view.js';
-import { conceptView } from './views/concept_view.js';
-import { invalidTime } from './views/invalid_time.js';
-import { teacherSelect, taSelect } from './views/user_select.js';
-import { osFaculty, cohortFaculty, foundationFaculty } from './views/faculty_form.js';
+import { firstView } from './views/modals/first_view.js';
+import { foundationView } from './views/modals/foundation_view.js';
+import { cohortView } from './views/modals/cohort_view.js';
+import { osView } from './views/modals/os_view.js';
+import { conceptView } from './views/modals/concept_view.js';
+import { invalidTime } from './views/modals/invalid_time.js';
+import { osFaculty, cohortFaculty, foundationFaculty } from './views/modals/faculty_form.js';
 //import { plannedJob } from '../../plan_schedule.js';
-import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/posts.js'; 
-import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/post_modals.js';
+import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/messages/posts.js'; 
+import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/messages/post_modals.js';
 import { google } from 'googleapis';
 import { requestUpdate, resolutionUpdate, counterUpdater, activeUpdater, resetCounters } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
@@ -24,9 +23,6 @@ const planned = "admin-planned-absences";
 const urgent = "admin-urgent-issues";
 
 //GoogleSheets login stuff
-const facultySheetUrl = "https://docs.google.com/spreadsheets/d/12lL5sna_hzX4kwClq8fk7D2LI0wbXB9GLRu99MTFqFM/gviz/tq?tq=";
-const subSheetId= "1dKwCu6hKetchuwyu7_kkN8FEN4N8TQfJl5jMeXlOQxo";
-const facultySheetId = "12lL5sna_hzX4kwClq8fk7D2LI0wbXB9GLRu99MTFqFM";
 const auth = new google.auth.GoogleAuth({
     keyFile: "credentials.json",
     scopes: "https://www.googleapis.com/auth/spreadsheets",
@@ -36,11 +32,12 @@ const interestedColumns = 'A,C,D,E,F,G'
 //Monthly Reset Logic
 const rule = new RecurrenceRule();
 rule.hour = 24;
+console.log(rule);
 
 async function monthlyReset(rule) {
     scheduleJob(rule, async () => {
         console.log("Monthly Reset Job is firing");
-        resetCounters(auth, facultySheetId);
+        resetCounters(auth, process.env.FACULTY_SHEET);
     })
 }
 
@@ -280,9 +277,9 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
     let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
 
-    resolutionUpdate(auth, subSheetId, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
+    resolutionUpdate(auth, process.env.SUB_SHEET, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
 
-    counterUpdater(sub, facultySheetUrl, auth, facultySheetId);
+    counterUpdater(sub, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, 1);
 
     //if (chosen !== subReqInfo['userId']) {
         try {
@@ -295,18 +292,16 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 blocks: resolvedModal(body['user']['id'], body['message']['text'])
             });
 
-            publishMessage(chosen, urgentConfirmation(chosen, subReqInfo), 
-                messageModal(urgentConfirmation(chosen, subReqInfo)));
-            publishMessage(subReqInfo['userId'], urgentNotification(chosen, subReqInfo), 
-                messageModal(urgentNotification(chosen, subReqInfo)));
+            publishMessage(sub, urgentConfirmation(sub, subReqInfo), 
+                messageModal(urgentConfirmation(sub, subReqInfo)));
+            publishMessage(subReqInfo['userId'], urgentNotification(sub, subReqInfo), 
+                messageModal(urgentNotification(sub, subReqInfo)));
         }
         catch (error) {
             logger.error(error);
         }
     //}
 })
-
-app.view
 
 //Listener for submission of request
 app.view("request_view", async ({ ack, body, view, client, logger }) => {
@@ -349,6 +344,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let subReqInfo = {
         userId: body['user']['id'],
         session: sessionInput,
+        type: sessionType,
         link: view['state']['values']['link']['link_input']['value'],
         game: view['state']['values']['game']['game_input']['selected_option']['value'],
         date: view['state']['values']['date']['date_input']['selected_date'],
@@ -431,7 +427,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     sheetInfo['requestor'] = await emailGetter(subReqInfo['userId']);
 
     if (diffObj['minutes'] >= -30) {
-        subReqInfo['row'] = await requestUpdate(auth, subSheetId, sheetInfo);
+        subReqInfo['row'] = await requestUpdate(auth, process.env.SUB_SHEET, sheetInfo);
     } else {
         try {
             //Call open method for view with client
@@ -555,24 +551,46 @@ async function plannedScheduler(info) {
         console.log("Planned Job is firing");
         const interestedArray = await fetchInterested(info['channel'], info['msgTs']);
         if (typeof interestedArray !== 'undefined') {
-            const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
+            const verifiedMap = fetch(queryMaker(process.env.FACULTY_SHEET_URL, interestedArray, interestedColumns), info)
                 .then(res => res.text())
                 .then(rep => {
                     const data = JSON.parse(rep.substring(47).slice(0,-2));
 
                     console.log(data);
                     let interestedMap = mapMaker(data['table']['rows']);
+                    console.log(interestedMap);
                     interestedMap.forEach(function(value, key) {
-                        if (info['faculty'] === 'Teacher') {
-                            if (value[1] !== 'Teacher') interestedMap.delete(key);
+                        if (info['faculty'] === 'teacher') {
+                            if (value[1] !== 'Teacher') {
+                                interestedMap.delete(key);
+                                console.log(value[1])
+                                console.log(`${key} is not a teacher`);
+                            }
+                            console.log(interestedMap)
                         } else if (info['faculty'] === 'TA') {
-                            if (value[1] !== 'TA') interestedMap.delete(key);
-                        } else if (info['faculty'] === 'qualified Teacher or TA') {
-                            if (!value[2]) interestedMap.delete(key); 
+                            if (value[1] !== 'TA') {
+                                interestedMap.delete(key);
+                                console.log(value[1])
+                                console.log(`${key} is not a TA`);
+                            }
+                            console.log(interestedMap)
+                        } else if (info['faculty'] === 'qualified teacher or TA') {
+                            if (!value[2]) {
+                                interestedMap.delete(key);
+                                console.log(value[2])
+                                console.log(`${key} is not OS qualified`);
+                            }
+                            console.log(interestedMap)
                         } 
 
-                        if (info['type'] == "Foundation") {
-                            if (!value[3]) interestedMap.delete(key);
+                        console.log(info['type']);
+                        if (info['type'] === "Foundation") {
+                            if (!value[3]) {
+                                interestedMap.delete(key);
+                                console.log(value[3])
+                                console.log(`${key} is not Foundation qualified`);
+                            }
+                            console.log(interestedMap)
                         }
                     })
                     return interestedMap
@@ -580,7 +598,7 @@ async function plannedScheduler(info) {
 
             const jobLogic = async (info) => {
                 const verified = await verifiedMap;
-            
+                console.log(verifiedMap);
                 console.log("Verified is defined");        
                 let message;
                 let chosen = await randomSelector(verified);
@@ -589,7 +607,7 @@ async function plannedScheduler(info) {
                 let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
                 let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
 
-                resolutionUpdate(auth, subSheetId, info, verified, chosen, false, `${dor} ${tor}`);
+                resolutionUpdate(auth, process.env.SUB_SHEET, info, verified, chosen, false, `${dor} ${tor}`);
 
                 try {
                     // Call the conversations.history method using the built-in WebClient
@@ -628,7 +646,13 @@ async function plannedScheduler(info) {
                 publishMessage(info['userId'], notification(chosen, info)); 
             }
 
-            jobLogic(info);
+            if (verifiedMap.size > 0) {
+                jobLogic(info);
+            } else if (isPreUrgent(info)) {
+                semiPlannedLogic(info);
+            } else {
+                plannedLogic(info);
+            }
         } else if (isPreUrgent(info)) {
             semiPlannedLogic(info);
         } else {
@@ -646,7 +670,7 @@ async function semiPlannedScheduler(info) {
         console.log("SemiPlanned Job is firing");
         const interestedArray = await fetchInterested(info['channel'], info['msgTs']);
         if (typeof interestedArray !== 'undefined') {
-            const verifiedMap = fetch(queryMaker(facultySheetUrl, interestedArray, interestedColumns), info)
+            const verifiedMap = fetch(queryMaker(process.env.FACULTY_SHEET_URL, interestedArray, interestedColumns), info)
                 .then(res => res.text())
                 .then(rep => {
                     const data = JSON.parse(rep.substring(47).slice(0,-2));
@@ -675,7 +699,7 @@ async function semiPlannedScheduler(info) {
                 let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
                 let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
 
-                resolutionUpdate(auth, subSheetId, info, verified, chosen, false, `${dor} ${tor}`);
+                resolutionUpdate(auth, process.env.SUB_SHEET, info, verified, chosen, false, `${dor} ${tor}`);
 
                 try {
                     // Call the conversations.history method using the built-in WebClient
@@ -713,7 +737,14 @@ async function semiPlannedScheduler(info) {
                 publishMessage(chosen, confirmation(chosen, info));
                 publishMessage(info['userId'], notification(chosen, info)); 
             } 
-            jobLogic(info);
+
+            if (verifiedMap.size > 0) {
+                jobLogic(info);
+            } else if (isUrgent(info)) {
+                urgentLogic(info);
+            } else {
+                semiPlannedLogic(info);
+            }
         } else if (isUrgent(info)) {
             urgentLogic(info);
         } else {
@@ -774,7 +805,7 @@ function findLowSub(verifiedMap) {
     var i = 0;
     var currentLow = 0;
 
-    verifiedMap.forEach((value, key) => activeUpdater(key, facultySheetUrl, auth, facultySheetId))
+    verifiedMap.forEach((value, key) => activeUpdater(key, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET))
     //Iterate through and if anything is lower than current low set that as current low
     verifiedMap.forEach(function (value, key) {
         if (i === 0) {
@@ -814,7 +845,7 @@ async function randomSelector(verifiedMap) {
     var chosen = selections[random];
 
     //Update counter in selected Faculty map and Whole faculty map\
-    counterUpdater(chosen, facultySheetUrl, auth, facultySheetId);
+    counterUpdater(chosen, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, 1);
 
     console.log(chosen + " was picked.");
     return chosen;
