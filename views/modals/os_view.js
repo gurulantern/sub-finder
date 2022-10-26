@@ -3,17 +3,19 @@ import { teacherSelect, taSelect } from './user_select.js';
 /**
  * Returns Open Session Modal object using current date and time in PT
  * @param {*} today Current date/time in PT
+ * @param {*} teacher If true adds TA Select
+ * @param {*} qualified If true foregoes staff select and places a divider block in instead
  * @returns Open Session Modal
  */
 function osView(today, teacher, qualified) {
     let facultyChoice;
     if (qualified) {
-        facultyChoice = 		{
+        facultyChoice = {
 			"type": "divider"
 		};
     } else if (teacher) {
         facultyChoice = taSelect;
-    } else if (teacher) {
+    } else if (!teacher) {
         facultyChoice = teacherSelect;
     }
 

@@ -11,7 +11,7 @@ import { invalidTime } from './views/modals/invalid_time.js';
 import { osFaculty, cohortFaculty, foundationFaculty } from './views/modals/faculty_form.js';
 //import { plannedJob } from '../../plan_schedule.js';
 import { plannedPost, urgentPost, urgentConfirmation, urgentNotification, urgentValues, confirmation, notification } from './views/messages/posts.js'; 
-import { messageModal, urgentModal, resolvedModal, plannedMoveModal } from './views/messages/post_modals.js';
+import { messageModal, resetterMsg, urgentModal, resolvedModal, plannedMoveModal } from './views/messages/post_modals.js';
 import { google } from 'googleapis';
 import { requestUpdate, resolutionUpdate, counterUpdater, activeUpdater, resetCounters } from './database/update_sheet_functions.js';
 import { mapMaker, queryMaker } from './database/read_sheet_functions.js';
@@ -34,14 +34,10 @@ const rule = new RecurrenceRule();
 rule.hour = 24;
 console.log(rule);
 
-async function monthlyReset(rule) {
-    scheduleJob(rule, async () => {
-        console.log("Monthly Reset Job is firing");
-        resetCounters(auth, process.env.FACULTY_SHEET);
-    })
-}
-
-monthlyReset(rule);
+scheduleJob('0 23 28 * *', async () => {
+    console.log("Monthly Reset Job is firing");
+    resetCounters(auth, process.env.FACULTY_SHEET);
+})
 
 /**
  * Function to set new deadlines to check for substitutes
@@ -81,7 +77,6 @@ async function emailGetter(userId) {
  * @returns String of channel ID
  */
 async function findConversation(name) {
-    let channelId;
     try {
         const result = await app.client.conversations.list({
             token: process.env.SLACK_BOT_TOKEN
@@ -90,7 +85,6 @@ async function findConversation(name) {
         for (const channel of result.channels) {
             if (channel.name === name) {
                 console.log("Found conversation ID " + channel.id);
-                channelId = channel.id;
                 return await channel.id;
             }
         }
@@ -115,8 +109,10 @@ async function publishMessage(id, text, blocks) {
             text: text,
             blocks: blocks
         });
-        let messageTs = result['message']['ts'];
-        return await result['message']['ts'];
+        console.log(result);
+        let msgValues = result['ts'] + ',' + result['channel'];
+        console.log(msgValues)
+        return await msgValues;
     }
     catch (error) {
         console.log(error);
@@ -258,27 +254,52 @@ app.action("faculty-action", async ({ body, ack, client, logger }) => {
 //App action for responding to Urgent Button presses
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
-    let message = body['message']['text'];
     let sub = body['user']['id'];
     let subEmail = await emailGetter(sub);    
+    let subReqInfo;
+    console.log(sub);
 
-    let infoArr = body['actions'][0]['value'].split(",");
-    let subReqInfo = {
-        userId: infoArr[0],
-        session: infoArr[1],
-        game: infoArr[2],
-        time: infoArr[3],
-        link: infoArr[4],
-        faculty: infoArr[5],
-        moved: infoArr[6],
-        row: infoArr[7]
-    }    
+    let valueArr = body['actions'][0]['value'].split(",");
 
+    //Conditional to check for reset or initial info object
+    if (valueArr.length < 12) {
+        subReqInfo = {
+            userId: valueArr[0],
+            session: valueArr[1],
+            game: valueArr[2],
+            time: valueArr[3],
+            link: valueArr[4],
+            faculty: valueArr[5],
+            moved: valueArr[6],
+            row: valueArr[7],
+            partner: valueArr[8],
+            age: valueArr[9]
+        }  
+    } else { 
+        subReqInfo = {
+            userId: valueArr[2],
+            session: valueArr[3],
+            game: valueArr[4],
+            time: valueArr[5],
+            link: valueArr[6],
+            faculty: valueArr[7],
+            moved: valueArr[8],
+            row: valueArr[9],
+            partner: valueArr[10],
+            age: valueArr[11]
+        }  
+    }
+
+    let message = urgentPost(subReqInfo, subReqInfo['faculty'] === 'qualified teacher or TA'? true:false);
+
+    let timeArr = subReqInfo.time.split(":")
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
     let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
+    
+    let endOfTime = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).plus({hours: 1}).setZone("America/Los_Angeles").toJSDate();
+    console.log(endOfTime.toLocaleString(DateTime.DATETIME_FULL));
 
     resolutionUpdate(auth, process.env.SUB_SHEET, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
-
     counterUpdater(sub, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, 1);
 
     //if (chosen !== subReqInfo['userId']) {
@@ -289,18 +310,88 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
                 channel: body['container']['channel_id'],
                 ts: body['message']['ts'],
                 text: message,
-                blocks: resolvedModal(body['user']['id'], body['message']['text'])
+                blocks: resolvedModal(body['user']['id'], message)
             });
 
-            publishMessage(sub, urgentConfirmation(sub, subReqInfo), 
-                messageModal(urgentConfirmation(sub, subReqInfo)));
-            publishMessage(subReqInfo['userId'], urgentNotification(sub, subReqInfo), 
-                messageModal(urgentNotification(sub, subReqInfo)));
+            console.log(result);
+
+            //Publish message including a reset request button to redo request, lower counter of previous faculty, and redo confirmation 
+            let confirmValues = await (await publishMessage(sub, urgentConfirmation(sub, subReqInfo), 
+                resetterMsg(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
+            let notifyValues = await (await publishMessage(subReqInfo['userId'], urgentNotification(sub, subReqInfo), 
+                resetterMsg(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
+            
+            scheduleJob(endOfTime, async () => {
+                const confirmed = await client.chat.update({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: confirmValues[1],
+                    ts: confirmValues[0],
+                    text: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+                    blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+
+                });
+
+                const notified = await client.chat.update({
+                    token: process.env.SLACK_BOT_TOKEN,
+                    channel: notifyValues[1],
+                    ts: notifyValues[0],
+                    text: messageModal(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+                    blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value'])
+                });
+            })
         }
         catch (error) {
             logger.error(error);
         }
     //}
+})
+
+app.action("reset-request", async({ ack, body, view, client, logger}) => {
+    await ack()
+
+    //Hacky but the info is passed along as csv and split into info object for message maker
+    console.log(body);
+    console.log(body.actions[0].value)
+    let valueArr = body.actions[0].value.split(',')
+    console.log(valueArr);
+    
+    let subReqInfo = {
+        userId: valueArr[2],
+        session: valueArr[3],
+        game: valueArr[4],
+        time: valueArr[5],
+        link: valueArr[6],
+        faculty: valueArr[7],
+        moved: valueArr[8],
+        row: valueArr[9],
+        partner: valueArr[10],
+        age: valueArr[11]
+    }  
+    counterUpdater(valueArr[1],process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, -1);
+
+    let message = urgentPost(subReqInfo, subReqInfo['faculty'] === 'qualified teacher or TA'? true:false);
+    let values = urgentValues(subReqInfo);
+
+    try {
+        //Call open method for view with client
+        const result = await client.chat.update({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: await  findConversation(urgent),
+            ts: valueArr[0],
+            blocks: urgentModal(message, values, subReqInfo['link'])
+        });
+
+        const  result1 = await client.chat.update({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: body.channel.id,
+            ts: body.container.message_ts,
+            text: "Your urgent request has been reset!"
+        })
+    }
+    catch (error) {
+        logger.error(error);
+    }
+
 })
 
 //Listener for submission of request
@@ -316,9 +407,6 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     let sessionInput;
     let qualified = false;
 
-    logger.info(view.blocks)
-    logger.info(view.state.values);
-    logger.info(view.blocks.length);
     //Create a Google Sheet record update
     let sheetInfo = {  }
 
@@ -448,7 +536,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
     subReqInfo['moved'] = "false";
     
     //URGENT -- Check how close the request is made to the time of session
-    if (diffObj['minutes'] <= 1 && diffObj['minutes'] >= -30) {
+    if (diffObj['minutes'] <= 60 && diffObj['minutes'] >= -60) {
         message = urgentPost(subReqInfo,  qualified);
         values = urgentValues(subReqInfo);
         blocks = urgentModal(message, values, subReqInfo['link']);
@@ -457,24 +545,22 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         console.log("Block: " + blocks);
 
         channel = await findConversation(urgent);
-        let msgTs = await publishMessage(channel, message, blocks);
-        //logger.info("URGENT POSTING in " + channel + " " + msgTs);
-    
-        subReqInfo['msgTs'] = msgTs;
-        subReqInfo['channel'] = channel;
+        publishMessage(channel, message, blocks);
     
         //console.log(subReqInfo);
     //PLANNED 
-    } else if (diffObj['minutes'] > 3) {
+    } else if (diffObj['minutes'] > 540) {
         //Await for the conversation and the message to publish
         message = plannedPost(subReqInfo, false, qualified);
 
         channel = await findConversation(planned);
-        let msgTs = await publishMessage(channel, message, blocks);
-        console.log("Posting Planned Req in " + channel + " " + msgTs);
+        let msgValues = await (await publishMessage(channel, message, blocks)).split(',');
 
-        subReqInfo['deadline'] = deadlineSetter(1);
-        subReqInfo['msgTs'] = msgTs;
+        console.log("Posting Planned Req in " + channel + " " + msgValues[0]);
+
+        ///480 minutes = 8 hours from post
+        subReqInfo['deadline'] = deadlineSetter(480);
+        subReqInfo['msgTs'] = msgValues[0];
         subReqInfo['channel'] = channel;
 
         //console.log(subReqInfo);
@@ -482,17 +568,17 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 
         plannedScheduler(subReqInfo);
     //SEMIPLANNED  
-    } else if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1) {
+    } else if (diffObj['minutes'] <= 540 && diffObj['minutes'] > 60) {
         //Await for the conversation and the message to publish
         console.log((diffObj['minutes']/2) -1);
         message = plannedPost(subReqInfo, false, qualified);
 
         channel = await findConversation(planned);
-        let msgTs = await publishMessage(channel, message, blocks);
-        console.log("Post SemiPlanned in " + channel + " " + msgTs);
+        let msgValues = await (await publishMessage(channel, message, blocks)).split(',');
+        console.log("Post SemiPlanned in " + channel + " " + msgValues[0]);
 
         subReqInfo['deadline'] = deadlineSetter(semiInterval(subReqInfo));
-        subReqInfo['msgTs'] = msgTs;
+        subReqInfo['msgTs'] = msgValues[0];
         subReqInfo['channel'] = channel;
 
         //console.log(subReqInfo);
@@ -502,7 +588,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 });
 
 const plannedLogic = (info) => {
-    info['deadline'] = deadlineSetter(1);
+    info['deadline'] = deadlineSetter(480);
     plannedScheduler(info);
 }
 
@@ -533,10 +619,10 @@ const urgentLogic = async (info) => {
     }
 
     let channel = await findConversation(urgent);
-    let msgTs = await publishMessage(channel, message, blocks);
-    console.log("URGENT POSTING in " + channel + " " + msgTs);
+    let msgValues = await (await publishMessage(channel, message, blocks)).split(',');
+    console.log("URGENT POSTING in " + channel + " " + msgValues[0]);
 
-    info['msgTs'] = msgTs;
+    info['msgTs'] = msgValues[0];
     info['channel'] = channel;
 
     console.log(info);
@@ -561,36 +647,22 @@ async function plannedScheduler(info) {
                     console.log(interestedMap);
                     interestedMap.forEach(function(value, key) {
                         if (info['faculty'] === 'teacher') {
-                            if (value[1] !== 'Teacher') {
-                                interestedMap.delete(key);
-                                console.log(value[1])
-                                console.log(`${key} is not a teacher`);
-                            }
+                            if (value[1] !== 'Teacher') interestedMap.delete(key);
+                                //console.log(`${key} is not a teacher`);
                             console.log(interestedMap)
                         } else if (info['faculty'] === 'TA') {
-                            if (value[1] !== 'TA') {
-                                interestedMap.delete(key);
-                                console.log(value[1])
-                                console.log(`${key} is not a TA`);
-                            }
+                            if (value[1] !== 'TA') interestedMap.delete(key);
+                                //console.log(`${key} is not a TA`);
                             console.log(interestedMap)
                         } else if (info['faculty'] === 'qualified teacher or TA') {
-                            if (!value[2]) {
-                                interestedMap.delete(key);
-                                console.log(value[2])
-                                console.log(`${key} is not OS qualified`);
-                            }
-                            console.log(interestedMap)
+                            if (!value[2]) interestedMap.delete(key);
+                                //console.log(`${key} is not OS qualified`);
                         } 
 
                         console.log(info['type']);
                         if (info['type'] === "Foundation") {
-                            if (!value[3]) {
-                                interestedMap.delete(key);
-                                console.log(value[3])
-                                console.log(`${key} is not Foundation qualified`);
-                            }
-                            console.log(interestedMap)
+                            if (!value[3]) interestedMap.delete(key);
+                                //console.log(`${key} is not Foundation qualified`);
                         }
                     })
                     return interestedMap
@@ -675,13 +747,29 @@ async function semiPlannedScheduler(info) {
                 .then(rep => {
                     const data = JSON.parse(rep.substring(47).slice(0,-2));
                     let interestedMap = mapMaker(data['table']['rows']);
+                    console.log(interestedMap);
                     interestedMap.forEach(function(value, key) {
-                        if (info['faculty'] === 'Teacher') {
-                            if (value[1] !== 'Teacher') interestedMap.delete(key);
-                        } else if (info['faculty'] === 'TA') {
-                            if (value[1] !== 'TA') interestedMap.delete(key)
-                        } else if (info['faculty'] === 'qualified Teacher or TA') {
-                            if (!value[2]) interestedMap.delete(key); 
+                        if (key === info['userId'] || key === info['partner']) {
+                            interestedMap.delete(key);
+                        } else {
+                            if (info['faculty'] === 'teacher') {
+                                if (value[1] !== 'Teacher') interestedMap.delete(key);
+                                    //console.log(`${key} is not a teacher`);
+                                console.log(interestedMap)
+                            } else if (info['faculty'] === 'TA') {
+                                if (value[1] !== 'TA') interestedMap.delete(key);
+                                    //console.log(`${key} is not a TA`);
+                                console.log(interestedMap)
+                            } else if (info['faculty'] === 'qualified teacher or TA') {
+                                if (!value[2]) interestedMap.delete(key);
+                                    //console.log(`${key} is not OS qualified`);
+                            } 
+
+                            console.log(info['type']);
+                            if (info['type'] === "Foundation") {
+                                if (!value[3]) interestedMap.delete(key);
+                                    //console.log(`${key} is not Foundation qualified`);
+                            }
                         }
                     })
                     return interestedMap

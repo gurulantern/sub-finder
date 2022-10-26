@@ -32,7 +32,7 @@ function urgentValues(info){
 }
 
 function urgentConfirmation(chosenId, info){
-    return `++++ URGENT ++++\n\n<@${chosenId}>! You have volunteered to sub *${info['session']}* playing *${info['game']}* at *${info['time']} PT*  for <@${info['userId']}>. \n\nYou can log into the AV session with this link (${info['link']}). DM your sub for more info and have them add you to the session. \n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
+    return `++++ URGENT ++++\n\n<@${chosenId}>! You have volunteered to sub *${info['session']}* playing *${info['game']}* at *${info['time']} PT*  for <@${info['userId']}>. \n\nYou can log into the AV session with this link (${info['link']}). DM the sub requestor or ${info['partner']} for more info and have them add you to the session. \n\n:sandwich: Thanks for using sub-finder! :sandwich:`;
 }
 
 function urgentNotification(chosenId, info){

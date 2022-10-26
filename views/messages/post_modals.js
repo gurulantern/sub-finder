@@ -39,6 +39,35 @@ function messageModal(msg) {
     return block;
 }
 
+function resetterMsg(msg, ts, user, info) {
+    let blocks = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": msg
+            }
+        },
+        {
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Reset Request",
+						"emoji": false
+					},
+					"value": ts + "," + user + "," + info,
+					"action_id": "reset-request"
+				}
+			]
+		}
+    ]
+
+    return blocks;
+}
+
 /**
  * Returns an Urgent Modal message with an Assist button
  * @param {*} msg String of text for urgent request
@@ -156,4 +185,4 @@ function plannedMoveModal(msg) {
     return move;
 }
 
-export { plannedModal, messageModal, dateBlocks, urgentModal, resolvedModal, plannedMoveModal };
+export { plannedModal, messageModal, resetterMsg, urgentModal, resolvedModal, plannedMoveModal };
