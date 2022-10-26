@@ -140,7 +140,7 @@ function semiInterval(info) {
 function isPreUrgent(info) {
     let preUrgent = DateTime.fromISO(info['ISO']);
     let diffObj = preUrgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 3 && diffObj['minutes'] > 1.15) {
+    if (diffObj['minutes'] <= 540 && diffObj['minutes'] > 60) {
         return true;
     }
     return false;
@@ -154,7 +154,7 @@ function isPreUrgent(info) {
 function isUrgent(info) {
     let urgent = DateTime.fromISO(info['ISO']);
     let diffObj = urgent.diffNow('minutes').toObject();
-    if (diffObj['minutes'] <= 1.15 && diffObj['minutes'] >= -30) {
+    if (diffObj['minutes'] <= 60 && diffObj['minutes'] >= -30) {
         return true;
     }
     return false;
