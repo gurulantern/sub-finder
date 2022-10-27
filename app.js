@@ -2,6 +2,7 @@ import pkg from '@slack/bolt';
 const { App, LogLevel } = pkg;
 import { DateTime } from 'luxon';
 import { scheduleJob, RecurrenceRule } from 'node-schedule';
+import { getTransitions, adjustForDS } from './time/dst_checker.js';
 import { firstView } from './views/modals/first_view.js';
 import { foundationView } from './views/modals/foundation_view.js';
 import { cohortView } from './views/modals/cohort_view.js';
@@ -29,12 +30,14 @@ const auth = new google.auth.GoogleAuth({
 });
 const interestedColumns = 'A,C,D,E,F,G'
 
+getTransitions(DateTime.now().year);
+adjustForDS(getTransitions(DateTime.now().year))
 //Monthly Reset Logic
 const rule = new RecurrenceRule();
 rule.hour = 24;
 console.log(rule);
 
-scheduleJob('0 23 28 * *', async () => {
+scheduleJob({hour: 0, date: 28}, async () => {
     console.log("Monthly Reset Job is firing");
     resetCounters(auth, process.env.FACULTY_SHEET);
 })
@@ -45,6 +48,7 @@ scheduleJob('0 23 28 * *', async () => {
  * @returns JSDate of new deadline
  */
 function deadlineSetter(time) {
+
     let deadline = DateTime.now().plus({ minutes: time }).toJSDate();
     return deadline;
 }
@@ -295,8 +299,8 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     let timeArr = subReqInfo.time.split(":")
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
     let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
-    
-    let endOfTime = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).plus({hours: 1}).setZone("America/Los_Angeles").toJSDate();
+    //set({hour: timeArr[0], minute: timeArr[1]})
+    let endOfTime = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).plus({minutes: 45}).setZone("America/Los_Angeles").toJSDate();
     console.log(endOfTime.toLocaleString(DateTime.DATETIME_FULL));
 
     resolutionUpdate(auth, process.env.SUB_SHEET, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
@@ -559,7 +563,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
         console.log("Posting Planned Req in " + channel + " " + msgValues[0]);
 
         ///480 minutes = 8 hours from post
-        subReqInfo['deadline'] = deadlineSetter(480);
+        subReqInfo['deadline'] = deadlineSetter(480 + adjustForDS(getTransitions(DateTime.now().year)));
         subReqInfo['msgTs'] = msgValues[0];
         subReqInfo['channel'] = channel;
 
@@ -588,7 +592,7 @@ app.view("request_view", async ({ ack, body, view, client, logger }) => {
 });
 
 const plannedLogic = (info) => {
-    info['deadline'] = deadlineSetter(480);
+    info['deadline'] = deadlineSetter(480 + adjustForDS(getTransitions(DateTime.now().year)));
     plannedScheduler(info);
 }
 
