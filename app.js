@@ -30,14 +30,12 @@ const auth = new google.auth.GoogleAuth({
 });
 const interestedColumns = 'A,C,D,E,F,G'
 
-getTransitions(DateTime.now().year);
-adjustForDS(getTransitions(DateTime.now().year))
 //Monthly Reset Logic
 const rule = new RecurrenceRule();
 rule.hour = 24;
 console.log(rule);
 
-scheduleJob({hour: 0, date: 28}, async () => {
+scheduleJob("0 0 28 * *", async () => {
     console.log("Monthly Reset Job is firing");
     resetCounters(auth, process.env.FACULTY_SHEET);
 })
@@ -258,6 +256,9 @@ app.action("faculty-action", async ({ body, ack, client, logger }) => {
 //App action for responding to Urgent Button presses
 app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     await ack();
+
+    //if (chosen !== subReqInfo['userId']) return;
+
     let sub = body['user']['id'];
     let subEmail = await emailGetter(sub);    
     let subReqInfo;
@@ -295,63 +296,59 @@ app.action("urgent_assist", async ({ body, ack, client, logger }) => {
     }
 
     let message = urgentPost(subReqInfo, subReqInfo['faculty'] === 'qualified teacher or TA'? true:false);
-
     let timeArr = subReqInfo.time.split(":")
     let dor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.DATE_SHORT);
     let tor = DateTime.now().setZone("America/Los_Angeles").toLocaleString(DateTime.TIME_24_WITH_SECONDS);
-    //set({hour: timeArr[0], minute: timeArr[1]})
-    let endOfTime = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).plus({minutes: 45}).setZone("America/Los_Angeles").toJSDate();
+    let endOfTime = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).plus({minutes: 60}).setZone("America/Los_Angeles").toJSDate();
+    console.log("END OF SESSION:")
     console.log(endOfTime.toLocaleString(DateTime.DATETIME_FULL));
 
+    logger.info("URGENT UPDATING GOOGLE SHEET");
     resolutionUpdate(auth, process.env.SUB_SHEET, subReqInfo, new Map(), subEmail, true, `${dor} ${tor}`);
     counterUpdater(sub, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, 1);
+    activeUpdater(sub, process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET);
 
-    //if (chosen !== subReqInfo['userId']) {
-        try {
-            //Call open method for view with client
-            const result = await client.chat.update({
-                token: process.env.SLACK_BOT_TOKEN,
-                channel: body['container']['channel_id'],
-                ts: body['message']['ts'],
-                text: message,
-                blocks: resolvedModal(body['user']['id'], message)
-            });
+    //Call open method for view with client
+    const result = await client.chat.update({
+        token: process.env.SLACK_BOT_TOKEN,
+        channel: body['container']['channel_id'],
+        ts: body['message']['ts'],
+        text: message,
+        blocks: resolvedModal(body['user']['id'], message)
+    });
 
-            console.log(result);
+    logger.info("URGENT POSTING MESSAGES TO USERS")
+    //Publish message including a reset request button to redo request, lower counter of previous faculty, and redo confirmation 
+    let confirmValues = await (await publishMessage(sub, urgentConfirmation(sub, subReqInfo), 
+        resetterMsg(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
+    let notifyValues = await (await publishMessage(subReqInfo['userId'], urgentNotification(sub, subReqInfo), 
+        resetterMsg(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
+/*
+    logger.info("SCHEDULING JOBS TO REMOVE BUTTONS")
+    scheduleJob(endOfTime, async () => {
+        const confirmed = await client.chat.update({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: confirmValues[1],
+            ts: confirmValues[0],
+            text: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+            blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
 
-            //Publish message including a reset request button to redo request, lower counter of previous faculty, and redo confirmation 
-            let confirmValues = await (await publishMessage(sub, urgentConfirmation(sub, subReqInfo), 
-                resetterMsg(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
-            let notifyValues = await (await publishMessage(subReqInfo['userId'], urgentNotification(sub, subReqInfo), 
-                resetterMsg(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']))).split(',');
-            
-            scheduleJob(endOfTime, async () => {
-                const confirmed = await client.chat.update({
-                    token: process.env.SLACK_BOT_TOKEN,
-                    channel: confirmValues[1],
-                    ts: confirmValues[0],
-                    text: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
-                    blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+        });
 
-                });
-
-                const notified = await client.chat.update({
-                    token: process.env.SLACK_BOT_TOKEN,
-                    channel: notifyValues[1],
-                    ts: notifyValues[0],
-                    text: messageModal(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
-                    blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value'])
-                });
-            })
-        }
-        catch (error) {
-            logger.error(error);
-        }
-    //}
+        const notified = await client.chat.update({
+            token: process.env.SLACK_BOT_TOKEN,
+            channel: notifyValues[1],
+            ts: notifyValues[0],
+            text: messageModal(urgentNotification(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value']),
+            blocks: messageModal(urgentConfirmation(sub, subReqInfo), body['message']['ts'], sub, body['actions'][0]['value'])
+        });
+    })
+*/
 })
 
 app.action("reset-request", async({ ack, body, view, client, logger}) => {
     await ack()
+
 
     //Hacky but the info is passed along as csv and split into info object for message maker
     console.log(body);
@@ -371,6 +368,15 @@ app.action("reset-request", async({ ack, body, view, client, logger}) => {
         partner: valueArr[10],
         age: valueArr[11]
     }  
+    let timeArr = subReqInfo.time.split(":")
+    let endOfSesh = DateTime.now().set({hour: timeArr[0], minute: timeArr[1]}).diffNow('minutes').toObject()
+    if (endOfSesh['minutes'] <= -60 ) {
+        console.log("MINUTES SINCE SESSION END");
+        console.log(endOfSesh['minutes'])
+        console.log("SESSION PASSED")
+        return;
+    }
+
     counterUpdater(valueArr[1],process.env.FACULTY_SHEET_URL, auth, process.env.FACULTY_SHEET, -1);
 
     let message = urgentPost(subReqInfo, subReqInfo['faculty'] === 'qualified teacher or TA'? true:false);
@@ -385,11 +391,19 @@ app.action("reset-request", async({ ack, body, view, client, logger}) => {
             blocks: urgentModal(message, values, subReqInfo['link'])
         });
 
-        const  result1 = await client.chat.update({
+        const result1 = await client.chat.update({
             token: process.env.SLACK_BOT_TOKEN,
             channel: body.channel.id,
             ts: body.container.message_ts,
-            text: "Your urgent request has been reset!"
+            blocks: [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "The urgent request has been reset!"
+                    }
+                }
+            ]
         })
     }
     catch (error) {
